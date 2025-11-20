@@ -2,21 +2,20 @@ console.log("transfer.js loaded, ethers =", typeof ethers);
 
 // --------------------- Constants ---------------------
 
-// Demo NFT that the maker is giving
+// Maker NFT – the one you own and want to trade
 const NFT_CONTRACT_ADDRESS = "0x29ecddfd0ca9b28fddc8c33c534a554fbd3818cf";
-const OPERATOR_ADDRESS     = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad"; // 0x operator (for approvals)
-const TOKEN_ID             = 12923; // kept for reference
+const OPERATOR_ADDRESS     = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad"; // 0x operator (approval target)
+const TOKEN_ID             = 12923; // for reference
 
 // 0x v2 Exchange contract (from your EIP-712 domain)
 const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ZERO_ADDRESS           = "0x0000000000000000000000000000000000000000";
 
-// These assetData values are from your example order (NFT-for-NFT swap).
-// Maker sends: NFT at NFT_CONTRACT_ADDRESS, tokenId = 12923
-// Taker sends: BAYC at 0xbc4c..., tokenId = 1234 (0x4d2)
+// Maker sends: your NFT at NFT_CONTRACT_ADDRESS, tokenId = 12923
 const DEMO_MAKER_ASSET_DATA =
   "0x94cfcdd700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000440257179200000000000000000000000029ecddfd0ca9b28fddc8c33c534a554fbd3818cf000000000000000000000000000000000000000000000000000000000000327b00000000000000000000000000000000000000000000000000000000";
 
+// Taker sends: BAYC at 0xbc4c..., tokenId = 1234 (example – change later if you want)
 const DEMO_TAKER_ASSET_DATA =
   "0x94cfcdd7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004402571792000000000000000000000000bc4ca0eda7647a8ab7c2061c2e118a18a936f13d00000000000000000000000000000000000000000000000000000000000004d200000000000000000000000000000000000000000000000000000000";
 
@@ -118,12 +117,12 @@ async function approveOperatorForCollection() {
 // --------------------- Step 2 – Maker signs order ---------------------
 
 function buildDemoOrder(makerAddress, takerAddress) {
-  const now = Math.floor(Date.now() / 1000);
-  const expiry = now + 60 * 60 * 24; // 24 hours from now
+  const now    = Math.floor(Date.now() / 1000);
+  const expiry = now + 60 * 60 * 24; // 24 hours
 
   return {
     makerAddress,
-    takerAddress: takerAddress || ZERO_ADDRESS, // if empty, open to anyone
+    takerAddress: takerAddress && takerAddress !== "" ? takerAddress : ZERO_ADDRESS,
     feeRecipientAddress: ZERO_ADDRESS,
     senderAddress:       ZERO_ADDRESS,
     makerAssetAmount:    "1",
@@ -131,9 +130,9 @@ function buildDemoOrder(makerAddress, takerAddress) {
     makerFee:            "0",
     takerFee:            "0",
     expirationTimeSeconds: String(expiry),
-    salt:                String(Date.now()), // simple unique salt for demo
-    makerAssetData:      DEMO_MAKER_ASSET_DATA,
-    takerAssetData:      DEMO_TAKER_ASSET_DATA,
+    salt:                  String(Date.now()), // simple unique salt for demo
+    makerAssetData:        DEMO_MAKER_ASSET_DATA,
+    takerAssetData:        DEMO_TAKER_ASSET_DATA,
   };
 }
 
@@ -149,7 +148,7 @@ async function signOrderAsMaker() {
     const maker    = await signer.getAddress();
 
     const takerInput = document.getElementById("takerAddressInput");
-    const takerAddr  = (takerInput && takerInput.value) ? takerInput.value.trim() : ZERO_ADDRESS;
+    const takerAddr  = takerInput ? takerInput.value.trim() : "";
 
     const order = buildDemoOrder(maker, takerAddr);
 
@@ -169,7 +168,29 @@ async function signOrderAsMaker() {
       orderSigEl.value = signature;
     }
 
-    alert("Order signed! Copy the JSON & signature for the taker.");
+    // Save to backend (Netlify function) to generate sharable URL
+    try {
+      const res = await fetch("/.netlify/functions/save-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order, signature }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error("save-order failed:", txt);
+        alert("Order signed, but failed to save on server.");
+        return;
+      }
+
+      const { id } = await res.json();
+      const tradeUrl = `${window.location.origin}/?orderId=${encodeURIComponent(id)}`;
+      console.log("Trade created with ID:", id, "URL:", tradeUrl);
+      alert("Order signed and saved!\n\nShare this URL with the taker:\n\n" + tradeUrl);
+    } catch (saveErr) {
+      console.error("Error calling save-order:", saveErr);
+      alert("Order signed, but there was an error saving it on the backend.");
+    }
   } catch (err) {
     console.error(err);
     alert("Error while signing order: " + (err?.message || err));
@@ -193,15 +214,15 @@ async function acceptTradeAsTaker() {
     const orderSigEl  = document.getElementById("orderSignature");
 
     if (!orderJsonEl || !orderJsonEl.value) {
-      alert("No order JSON found. Paste a signed order first.");
+      alert("No order JSON found. Load a trade link or paste an order first.");
       return;
     }
     if (!orderSigEl || !orderSigEl.value) {
-      alert("No order signature found. Paste the signature first.");
+      alert("No order signature found.");
       return;
     }
 
-    const order = JSON.parse(orderJsonEl.value);
+    const order     = JSON.parse(orderJsonEl.value);
     const signature = orderSigEl.value.trim();
 
     console.log("Loaded order for taker:", order, "signature:", signature);
@@ -249,6 +270,33 @@ async function acceptTradeAsTaker() {
   }
 }
 
+// --------------------- Auto-load order from Netlify (taker) ---------------------
+
+async function autoLoadOrderFromUrl() {
+  const params  = new URLSearchParams(window.location.search);
+  const orderId = params.get("orderId");
+  if (!orderId) return;
+
+  try {
+    const res = await fetch(
+      "/.netlify/functions/get-order?id=" + encodeURIComponent(orderId)
+    );
+    if (!res.ok) {
+      console.warn("Failed to load order:", await res.text());
+      return;
+    }
+    const { order, signature } = await res.json();
+    console.log("Loaded order from backend:", order, signature);
+
+    const orderJsonEl = document.getElementById("orderJson");
+    const orderSigEl  = document.getElementById("orderSignature");
+    if (orderJsonEl) orderJsonEl.value = JSON.stringify(order, null, 2);
+    if (orderSigEl)  orderSigEl.value  = signature;
+  } catch (e) {
+    console.error("Error loading order:", e);
+  }
+}
+
 // --------------------- Wire up buttons ---------------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -266,4 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (acceptBtn) {
     acceptBtn.addEventListener("click", acceptTradeAsTaker);
   }
+
+  // Try to auto-load order if ?orderId=... is present
+  autoLoadOrderFromUrl();
 });
