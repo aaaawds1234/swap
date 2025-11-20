@@ -1,42 +1,41 @@
-export const handler = async (event, context) => {
+import { neon } from "@netlify/neon";
+
+export const handler = async (event) => {
   if (event.httpMethod !== "GET") {
-    return {
-      statusCode: 405,
-      body: "Method Not Allowed",
-    };
+    return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   try {
-    const params = event.queryStringParameters || {};
-    const id = params.id;
+    const id = event.queryStringParameters?.id;
 
     if (!id) {
-      return {
-        statusCode: 400,
-        body: "Missing id",
-      };
+      return { statusCode: 400, body: "Missing id" };
     }
 
-    globalThis.__ORDERS__ = globalThis.__ORDERS__ || {};
-    const data = globalThis.__ORDERS__[id];
+    const sql = neon(process.env.NETLIFY_DATABASE_URL);
 
-    if (!data) {
-      return {
-        statusCode: 404,
-        body: "Order not found",
-      };
+    const rows = await sql`
+      SELECT order_json, signature
+      FROM orders
+      WHERE order_id = ${id}
+      LIMIT 1;
+    `;
+
+    if (rows.length === 0) {
+      return { statusCode: 404, body: "Order not found" };
     }
 
+    // rows[0].order_json is a JSON string; rows[0].signature is the hex sig
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        order: JSON.parse(rows[0].order_json),
+        signature: rows[0].signature,
+      }),
     };
   } catch (err) {
-    console.error("get-order error:", err);
-    return {
-      statusCode: 500,
-      body: "Server error",
-    };
+    console.error("get-order ERROR:", err);
+    return { statusCode: 500, body: "Server error" };
   }
 };
