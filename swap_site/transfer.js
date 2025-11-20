@@ -46,12 +46,22 @@ const ZEROX_EXCHANGE_ABI = [
   ") external returns (uint256 fillMakerAssetAmount, uint256 fillTakerAssetAmount)"
 ];
 
-// EIP-712 domain & types for 0x v2 Order
-const EIP712_DOMAIN = {
+// 0x v2 EIP-712 domain base (without chainId)
+const EIP712_DOMAIN_BASE = {
   name: "0x Protocol",
   version: "2",
   verifyingContract: ZEROX_EXCHANGE_ADDRESS,
 };
+
+// Build the full domain with the correct chainId from the provider
+async function getEip712Domain(provider) {
+  const network = await provider.getNetwork(); // ethers v5: { chainId, name }
+  return {
+    ...EIP712_DOMAIN_BASE,
+    chainId: network.chainId,
+  };
+}
+
 
 const EIP712_TYPES = {
   Order: [
