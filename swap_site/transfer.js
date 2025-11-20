@@ -4,10 +4,10 @@ console.log("transfer.js loaded, ethers =", typeof ethers);
 
 // Maker NFT – the one you own and want to trade
 const NFT_CONTRACT_ADDRESS = "0x29ecddfd0ca9b28fddc8c33c534a554fbd3818cf";
-const OPERATOR_ADDRESS     = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad"; // 0x operator (approval target)
+const OPERATOR_ADDRESS     = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad"; // 0x ERC721 proxy
 const TOKEN_ID             = 12923; // for reference
 
-// 0x v2 Exchange contract (from your EIP-712 domain)
+// 0x v2 Exchange contract (mainnet)
 const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
 const ZERO_ADDRESS           = "0x0000000000000000000000000000000000000000";
 
@@ -15,7 +15,7 @@ const ZERO_ADDRESS           = "0x0000000000000000000000000000000000000000";
 const DEMO_MAKER_ASSET_DATA =
   "0x94cfcdd700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000440257179200000000000000000000000029ecddfd0ca9b28fddc8c33c534a554fbd3818cf000000000000000000000000000000000000000000000000000000000000327b00000000000000000000000000000000000000000000000000000000";
 
-// Taker sends: BAYC at 0xbc4c..., tokenId = 1234 (example – change later if you want)
+// Taker sends: BAYC at 0xbc4c..., tokenId = 1234 (example – can change later)
 const DEMO_TAKER_ASSET_DATA =
   "0x94cfcdd7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004402571792000000000000000000000000bc4ca0eda7647a8ab7c2061c2e118a18a936f13d00000000000000000000000000000000000000000000000000000000000004d200000000000000000000000000000000000000000000000000000000";
 
@@ -46,22 +46,13 @@ const ZEROX_EXCHANGE_ABI = [
   ") external returns (uint256 fillMakerAssetAmount, uint256 fillTakerAssetAmount)"
 ];
 
-// 0x v2 EIP-712 domain base (without chainId)
-const EIP712_DOMAIN_BASE = {
+// EIP-712 domain & types for 0x v2 Order
+// This matches the JSON you saw in MetaMask earlier.
+const EIP712_DOMAIN = {
   name: "0x Protocol",
   version: "2",
   verifyingContract: ZEROX_EXCHANGE_ADDRESS,
 };
-
-// Build the full domain with the correct chainId from the provider
-async function getEip712Domain(provider) {
-  const network = await provider.getNetwork(); // ethers v5: { chainId, name }
-  return {
-    ...EIP712_DOMAIN_BASE,
-    chainId: network.chainId,
-  };
-}
-
 
 const EIP712_TYPES = {
   Order: [
@@ -164,23 +155,53 @@ async function signOrderAsMaker() {
 
     console.log("Order to sign:", order);
 
-    // ✅ Build correct EIP-712 domain (with chainId)
-    const domain = await getEip712Domain(provider);
+    // Sign typed data (standard EIP-712) with ethers
+    const rawSig = await signer._signTypedData(EIP712_DOMAIN, EIP712_TYPES, order);
+    // rawSig = 0x + r(64) + s(64) + v(2)
 
-    const rawSig = await signer._signTypedData(domain, EIP712_TYPES, order);
+    // Split into r / s / v
+    const split = ethers.utils.splitSignature(rawSig);
+    const r = split.r; // 0x...
+    const s = split.s; // 0x...
+    const v = split.v; // 27 or 28
 
-    // 0x v2 expects r||s||v||signatureType, EIP712 signatureType = 0x02
-    const signature = rawSig + "02";
+    // 0x expects signature format: [v][r][s][signatureType]
+    const vHex = ethers.utils.hexlify(v).slice(2).padStart(2, "0"); // 1 byte
+    const signatureTypeHex = "02"; // EIP712 signature type for 0x
 
-    console.log("Signed order:", { order, signature });
+    const signature =
+      "0x" +
+      vHex +
+      r.slice(2) +
+      s.slice(2) +
+      signatureTypeHex;
+
+    console.log("Packed 0x signature:", signature);
+
+    // Optional sanity check – verifyTypedData must recover maker from rawSig
+    try {
+      const recovered = ethers.utils.verifyTypedData(
+        EIP712_DOMAIN,
+        EIP712_TYPES,
+        order,
+        rawSig
+      );
+      console.log("Maker:", maker, "Recovered from rawSig:", recovered);
+    } catch (e) {
+      console.warn("verifyTypedData sanity check failed:", e);
+    }
 
     // Put into UI
     const orderJsonEl = document.getElementById("orderJson");
     const orderSigEl  = document.getElementById("orderSignature");
-    if (orderJsonEl) orderJsonEl.value = JSON.stringify(order, null, 2);
-    if (orderSigEl)  orderSigEl.value  = signature;
+    if (orderJsonEl) {
+      orderJsonEl.value = JSON.stringify(order, null, 2);
+    }
+    if (orderSigEl) {
+      orderSigEl.value = signature;
+    }
 
-    // Save to backend as before
+    // Save to backend (Netlify function) to generate sharable URL
     try {
       const res = await fetch("/.netlify/functions/save-order", {
         method: "POST",
