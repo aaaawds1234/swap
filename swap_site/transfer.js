@@ -154,25 +154,23 @@ async function signOrderAsMaker() {
 
     console.log("Order to sign:", order);
 
-    const rawSig = await signer._signTypedData(EIP712_DOMAIN, EIP712_TYPES, order);
+    // ✅ Build correct EIP-712 domain (with chainId)
+    const domain = await getEip712Domain(provider);
 
-    // 0x v2 expects r||s||v||signatureType
-    // EIP712 signature type = 0x02
-    const signature = rawSig + "02"; // rawSig already starts with "0x"
+    const rawSig = await signer._signTypedData(domain, EIP712_TYPES, order);
+
+    // 0x v2 expects r||s||v||signatureType, EIP712 signatureType = 0x02
+    const signature = rawSig + "02";
 
     console.log("Signed order:", { order, signature });
 
     // Put into UI
     const orderJsonEl = document.getElementById("orderJson");
     const orderSigEl  = document.getElementById("orderSignature");
-    if (orderJsonEl) {
-      orderJsonEl.value = JSON.stringify(order, null, 2);
-    }
-    if (orderSigEl) {
-      orderSigEl.value = signature;
-    }
+    if (orderJsonEl) orderJsonEl.value = JSON.stringify(order, null, 2);
+    if (orderSigEl)  orderSigEl.value  = signature;
 
-    // Save to backend (Netlify function) to generate sharable URL
+    // Save to backend as before
     try {
       const res = await fetch("/.netlify/functions/save-order", {
         method: "POST",
