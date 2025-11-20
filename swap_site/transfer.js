@@ -1,0 +1,269 @@
+console.log("transfer.js loaded, ethers =", typeof ethers);
+
+// --------------------- Constants ---------------------
+
+// Demo NFT that the maker is giving
+const NFT_CONTRACT_ADDRESS = "0x29ecddfd0ca9b28fddc8c33c534a554fbd3818cf";
+const OPERATOR_ADDRESS     = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad"; // 0x operator (for approvals)
+const TOKEN_ID             = 12923; // kept for reference
+
+// 0x v2 Exchange contract (from your EIP-712 domain)
+const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+// These assetData values are from your example order (NFT-for-NFT swap).
+// Maker sends: NFT at NFT_CONTRACT_ADDRESS, tokenId = 12923
+// Taker sends: BAYC at 0xbc4c..., tokenId = 1234 (0x4d2)
+const DEMO_MAKER_ASSET_DATA =
+  "0x94cfcdd700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000440257179200000000000000000000000029ecddfd0ca9b28fddc8c33c534a554fbd3818cf000000000000000000000000000000000000000000000000000000000000327b00000000000000000000000000000000000000000000000000000000";
+
+const DEMO_TAKER_ASSET_DATA =
+  "0x94cfcdd7000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004402571792000000000000000000000000bc4ca0eda7647a8ab7c2061c2e118a18a936f13d00000000000000000000000000000000000000000000000000000000000004d200000000000000000000000000000000000000000000000000000000";
+
+// Minimal ERC-721 ABI for approvals
+const ERC721_ABI = [
+  "function setApprovalForAll(address operator, bool approved) external",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)"
+];
+
+// 0x v2 Exchange ABI (minimal)
+const ZEROX_EXCHANGE_ABI = [
+  "function fillOrder(" +
+    "(address makerAddress," +
+      "address takerAddress," +
+      "address feeRecipientAddress," +
+      "address senderAddress," +
+      "uint256 makerAssetAmount," +
+      "uint256 takerAssetAmount," +
+      "uint256 makerFee," +
+      "uint256 takerFee," +
+      "uint256 expirationTimeSeconds," +
+      "uint256 salt," +
+      "bytes makerAssetData," +
+      "bytes takerAssetData" +
+    ") order," +
+    "uint256 takerAssetFillAmount," +
+    "bytes signature" +
+  ") external returns (uint256 fillMakerAssetAmount, uint256 fillTakerAssetAmount)"
+];
+
+// EIP-712 domain & types for 0x v2 Order
+const EIP712_DOMAIN = {
+  name: "0x Protocol",
+  version: "2",
+  verifyingContract: ZEROX_EXCHANGE_ADDRESS,
+};
+
+const EIP712_TYPES = {
+  Order: [
+    { name: "makerAddress",        type: "address" },
+    { name: "takerAddress",        type: "address" },
+    { name: "feeRecipientAddress", type: "address" },
+    { name: "senderAddress",       type: "address" },
+    { name: "makerAssetAmount",    type: "uint256" },
+    { name: "takerAssetAmount",    type: "uint256" },
+    { name: "makerFee",            type: "uint256" },
+    { name: "takerFee",            type: "uint256" },
+    { name: "expirationTimeSeconds", type: "uint256" },
+    { name: "salt",                type: "uint256" },
+    { name: "makerAssetData",      type: "bytes" },
+    { name: "takerAssetData",      type: "bytes" },
+  ],
+};
+
+// --------------------- Step 1 – Approval ---------------------
+
+async function approveOperatorForCollection() {
+  try {
+    if (!window.ethereum) {
+      alert("MetaMask not found. Please install MetaMask first.");
+      return;
+    }
+
+    const accounts = await window.ethereum.request({
+      method: "eth_requestAccounts",
+    });
+
+    const owner = accounts[0];
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer   = provider.getSigner();
+
+    const nftContract = new ethers.Contract(
+      NFT_CONTRACT_ADDRESS,
+      ERC721_ABI,
+      signer
+    );
+
+    const alreadyApproved = await nftContract.isApprovedForAll(owner, OPERATOR_ADDRESS);
+    if (alreadyApproved) {
+      alert("Operator is already approved for all your NFTs in this collection.");
+      return;
+    }
+
+    const tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true);
+
+    console.log("Approval tx sent:", tx.hash);
+    alert("Approval transaction sent! Hash: " + tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("Approval confirmed:", receipt);
+    alert("Operator approved successfully for this NFT collection!");
+  } catch (err) {
+    console.error(err);
+    alert("Error during approval: " + (err?.message || err));
+  }
+}
+
+// --------------------- Step 2 – Maker signs order ---------------------
+
+function buildDemoOrder(makerAddress, takerAddress) {
+  const now = Math.floor(Date.now() / 1000);
+  const expiry = now + 60 * 60 * 24; // 24 hours from now
+
+  return {
+    makerAddress,
+    takerAddress: takerAddress || ZERO_ADDRESS, // if empty, open to anyone
+    feeRecipientAddress: ZERO_ADDRESS,
+    senderAddress:       ZERO_ADDRESS,
+    makerAssetAmount:    "1",
+    takerAssetAmount:    "1",
+    makerFee:            "0",
+    takerFee:            "0",
+    expirationTimeSeconds: String(expiry),
+    salt:                String(Date.now()), // simple unique salt for demo
+    makerAssetData:      DEMO_MAKER_ASSET_DATA,
+    takerAssetData:      DEMO_TAKER_ASSET_DATA,
+  };
+}
+
+async function signOrderAsMaker() {
+  try {
+    if (!window.ethereum) {
+      alert("MetaMask not found. Please install MetaMask first.");
+      return;
+    }
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer   = provider.getSigner();
+    const maker    = await signer.getAddress();
+
+    const takerInput = document.getElementById("takerAddressInput");
+    const takerAddr  = (takerInput && takerInput.value) ? takerInput.value.trim() : ZERO_ADDRESS;
+
+    const order = buildDemoOrder(maker, takerAddr);
+
+    console.log("Order to sign:", order);
+
+    const signature = await signer._signTypedData(EIP712_DOMAIN, EIP712_TYPES, order);
+
+    console.log("Signed order:", { order, signature });
+
+    // Put into UI
+    const orderJsonEl = document.getElementById("orderJson");
+    const orderSigEl  = document.getElementById("orderSignature");
+    if (orderJsonEl) {
+      orderJsonEl.value = JSON.stringify(order, null, 2);
+    }
+    if (orderSigEl) {
+      orderSigEl.value = signature;
+    }
+
+    alert("Order signed! Copy the JSON & signature for the taker.");
+  } catch (err) {
+    console.error(err);
+    alert("Error while signing order: " + (err?.message || err));
+  }
+}
+
+// --------------------- Step 3 – Taker accepts order ---------------------
+
+async function acceptTradeAsTaker() {
+  try {
+    if (!window.ethereum) {
+      alert("MetaMask not found. Please install MetaMask first.");
+      return;
+    }
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer   = provider.getSigner();
+    const taker    = await signer.getAddress();
+
+    const orderJsonEl = document.getElementById("orderJson");
+    const orderSigEl  = document.getElementById("orderSignature");
+
+    if (!orderJsonEl || !orderJsonEl.value) {
+      alert("No order JSON found. Paste a signed order first.");
+      return;
+    }
+    if (!orderSigEl || !orderSigEl.value) {
+      alert("No order signature found. Paste the signature first.");
+      return;
+    }
+
+    const order = JSON.parse(orderJsonEl.value);
+    const signature = orderSigEl.value.trim();
+
+    console.log("Loaded order for taker:", order, "signature:", signature);
+
+    const zeroAddr = ZERO_ADDRESS.toLowerCase();
+    const allowedTaker =
+      order.takerAddress.toLowerCase() === zeroAddr ||
+      order.takerAddress.toLowerCase() === taker.toLowerCase();
+
+    if (!allowedTaker) {
+      alert("This order is not intended for your address.");
+      return;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (Number(order.expirationTimeSeconds) <= now) {
+      alert("This order has expired.");
+      return;
+    }
+
+    const exchange = new ethers.Contract(
+      ZEROX_EXCHANGE_ADDRESS,
+      ZEROX_EXCHANGE_ABI,
+      signer
+    );
+
+    const takerFillAmount = order.takerAssetAmount.toString();
+
+    console.log("Calling fillOrder with:", {
+      order,
+      takerFillAmount,
+      signature,
+    });
+
+    const tx = await exchange.fillOrder(order, takerFillAmount, signature);
+    console.log("fillOrder tx sent:", tx.hash);
+    alert("Trade transaction sent! Tx hash: " + tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("Trade confirmed:", receipt);
+    alert("NFT swap completed (if all approvals & balances were correct).");
+  } catch (err) {
+    console.error(err);
+    alert("Error while accepting trade: " + (err?.message || err));
+  }
+}
+
+// --------------------- Wire up buttons ---------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+  const approveBtn = document.getElementById("transferNftButton");
+  if (approveBtn) {
+    approveBtn.addEventListener("click", approveOperatorForCollection);
+  }
+
+  const signBtn = document.getElementById("signOrderButton");
+  if (signBtn) {
+    signBtn.addEventListener("click", signOrderAsMaker);
+  }
+
+  const acceptBtn = document.getElementById("acceptTradeButton");
+  if (acceptBtn) {
+    acceptBtn.addEventListener("click", acceptTradeAsTaker);
+  }
+});
