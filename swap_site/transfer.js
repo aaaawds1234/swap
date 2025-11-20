@@ -154,7 +154,11 @@ async function signOrderAsMaker() {
 
     console.log("Order to sign:", order);
 
-    const signature = await signer._signTypedData(EIP712_DOMAIN, EIP712_TYPES, order);
+    const rawSig = await signer._signTypedData(EIP712_DOMAIN, EIP712_TYPES, order);
+
+    // 0x v2 expects r||s||v||signatureType
+    // EIP712 signature type = 0x02
+    const signature = rawSig + "02"; // rawSig already starts with "0x"
 
     console.log("Signed order:", { order, signature });
 
