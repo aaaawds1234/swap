@@ -22,33 +22,83 @@
 
     <hr />
 
-    <h2>Step 1 – Approve NFT Collection (Maker)</h2>
-    <p>This approves the 0x operator to move your NFTs from the demo collection.</p>
-    <button id="transferNftButton">Approve NFT</button>
+    <h2>Step 1 – Maker NFT & Approval</h2>
+    <p>Maker: choose the NFT you are offering, then approve the 0x operator.</p>
+
+    <h3>Maker NFT (what YOU send)</h3>
+
+    <label>
+        Maker NFT contract:
+        <input
+            id="makerNftContractInput"
+            type="text"
+            size="60"
+            placeholder="0x... NFT contract address"
+        />
+    </label>
+    <br /><br />
+
+    <label>
+        Maker NFT token ID:
+        <input
+            id="makerTokenIdInput"
+            type="text"
+            size="20"
+            placeholder="e.g. 12923"
+        />
+    </label>
+    <br /><br />
+
+    <button id="transferNftButton">Approve Maker NFT</button>
 
     <hr />
 
     <h2>Step 2 – Create & Sign Order (Maker)</h2>
-    <p>Maker: enter the taker's address, then click "Sign Order (Maker)".</p>
+    <p>Maker: enter the taker’s wallet and the NFT the TAKER will send.</p>
+
     <label>
         Taker address:
         <input id="takerAddressInput" type="text" size="60" placeholder="0x..." />
     </label>
+
+    <h3>Taker NFT (what the TAKER sends)</h3>
+
+    <label>
+        Taker NFT contract:
+        <input
+            id="takerNftContractInput"
+            type="text"
+            size="60"
+            placeholder="0x... NFT contract address"
+        />
+    </label>
+    <br /><br />
+
+    <label>
+        Taker NFT token ID:
+        <input
+            id="takerTokenIdInput"
+            type="text"
+            size="20"
+            placeholder="e.g. 1234"
+        />
+    </label>
+
     <br /><br />
     <button id="signOrderButton">Sign Order (Maker)</button>
 
-    <p>Signed order JSON:</p>
+    <h3>Signed order JSON:</h3>
     <textarea id="orderJson" rows="10" cols="80" readonly></textarea>
 
-    <p>Order signature:</p>
+    <h3>Order signature:</h3>
     <input id="orderSignature" type="text" size="80" readonly />
 
     <hr />
 
     <h2>Step 3 – Accept Trade (Taker)</h2>
     <p>
-        Taker: load this page with the order JSON & signature filled in (or pasted),
-        then click "Accept Trade (Taker)" from the taker wallet.
+        Taker: open the trade link or paste the order + signature, then click accept
+        from the wallet that owns the taker NFT.
     </p>
     <button id="acceptTradeButton">Accept Trade (Taker)</button>
 
@@ -65,5 +115,6 @@
             document.getElementById('connected-address').innerText = "Connected: " + account;
         });
     </script>
+
 </body>
 </html>
