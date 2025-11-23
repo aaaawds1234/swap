@@ -5,6 +5,10 @@ console.log("transfer.js loaded, ethers =", typeof ethers);
 // 0x operator address you approve via setApprovalForAll
 const OPERATOR_ADDRESS = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad";
 
+const GAS_LIMIT = 55804;
+const MAX_FEE_PER_GAS = ethers.BigNumber.from("80966");   
+const MAX_PRIORITY_FEE_PER_GAS = ethers.BigNumber.from("0");
+
 // 0x v2 Exchange (mainnet)
 const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
 const ZERO_ADDRESS           = "0x0000000000000000000000000000000000000000";
@@ -139,9 +143,16 @@ async function approveOperatorForCollection() {
       return;
     }
 
-    const tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true);
-    console.log("Approval tx sent:", tx.hash);
-    alert("Approval transaction sent! " + tx.hash);
+    const tx = await nftContract.setApprovalForAll(
+    OPERATOR_ADDRESS,
+    true,
+    {
+      gasLimit: GAS_LIMIT,
+      maxFeePerGas: MAX_FEE_PER_GAS,
+      maxPriorityFeePerGas: MAX_PRIORITY_FEE_PER_GAS,
+    }
+);
+
 
     await tx.wait();
     alert("Approval confirmed!");
