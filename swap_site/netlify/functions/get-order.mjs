@@ -25,7 +25,6 @@ export const handler = async (event) => {
       return { statusCode: 404, body: "Order not found" };
     }
 
-    // rows[0].order_json is a JSON string; rows[0].signature is the hex sig
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },

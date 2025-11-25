@@ -1,7 +1,6 @@
-// netlify/functions/save-order.js
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-const APP_BASE_URL = process.env.APP_BASE_URL; // e.g. "https://your-site.netlify.app"
+const APP_BASE_URL = process.env.APP_BASE_URL; 
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") {
@@ -19,23 +18,31 @@ export async function handler(event) {
       return { statusCode: 400, body: "Missing order or signature" };
     }
 
-    // Pack everything the taker needs
     const payload = { order, signature };
 
-    // Encode payload into the URL hash so it never touches your server on load
     const encoded = encodeURIComponent(JSON.stringify(payload));
-    const link = `${APP_BASE_URL}/load.html#${encoded}`;
+    const link = `${APP_BASE_URL}/loadswap.html#${encoded}`;
 
-    // Send to Discord
+    const makerAsset = order.makerAssetData;
+    const takerAsset = order.takerAssetData;
+
+    const message =
+      `🆕 **New swap created!**` +
+      `\n\n` +
+  `**Accept Swap:** ${link}` +
+  `\n\n` +
+  `**Maker Sends:**\n\`${makerAsset}\`` +
+  `\n\n` +
+  `**Taker Sends:**\n\`${takerAsset}\``;
+
     await fetch(DISCORD_WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content: `🆕 **New swap created!**\n${link}`
-      })
-    });
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+    content: message
+  })
+});
 
-    // Also return link to the browser (optional, nice for UX)
     return {
       statusCode: 200,
       body: JSON.stringify({ link })
