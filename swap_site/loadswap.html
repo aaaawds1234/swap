@@ -12,16 +12,40 @@
         margin: 40px auto;
         padding: 0 16px;
       }
-      #swap-json {
+
+      h1 {
+        margin-bottom: 24px;
+      }
+
+      #details-box {
+        background: #f3f4f6;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        line-height: 1.6;
+      }
+
+      .label {
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .value {
+        color: #374151;
+      }
+
+      #raw-json {
         background: #0b1120;
         color: #e5e7eb;
         padding: 12px;
         border-radius: 8px;
         font-size: 12px;
         overflow-x: auto;
+        margin-top: 24px;
       }
+
       #fill-btn {
-        margin-top: 16px;
+        margin-top: 24px;
         padding: 10px 18px;
         border-radius: 9999px;
         border: none;
@@ -39,7 +63,19 @@
   <body>
     <h1>Fill Swap</h1>
 
-    <pre id="swap-json">Loading swap…</pre>
+    <!-- Human-readable decoded swap info -->
+    <div id="details-box">
+      <div><span class="label">Maker:</span> <span id="maker" class="value"></span></div>
+      <div><span class="label">Maker Sends:</span> <span id="maker-asset" class="value"></span></div>
+      <br />
+      <div><span class="label">Taker:</span> <span id="taker" class="value"></span></div>
+      <div><span class="label">Taker Sends:</span> <span id="taker-asset" class="value"></span></div>
+      <br />
+      <div><span class="label">Expiration:</span> <span id="expires" class="value"></span></div>
+    </div>
+
+    <!-- Raw JSON for debugging -->
+    <pre id="raw-json">Loading swap…</pre>
 
     <button id="fill-btn">Fill This Swap</button>
 

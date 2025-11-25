@@ -26,19 +26,19 @@ export async function handler(event) {
     const makerAsset = order.makerAssetData;
     const takerAsset = order.takerAssetData;
 
-    const message =
-      `🆕 **New swap created!**` +
-      `\n\n` +
-  `**Accept Swap:** ${link}` +
+const message =
+  `swap created` +
   `\n\n` +
-  `**Maker Sends:**\n\`${makerAsset}\`` +
+  `[accept swap](${link})` +
   `\n\n` +
-  `**Taker Sends:**\n\`${takerAsset}\``;
+  `maker sends:\n\`${makerAsset}\`` +
+  `\n\n` +
+  `taker sends:\n\`${takerAsset}\``;
 
-    await fetch(DISCORD_WEBHOOK, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+await fetch(DISCORD_WEBHOOK, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
     content: message
   })
 });

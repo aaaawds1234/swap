@@ -15,6 +15,9 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 // ERC721 Proxy ID for 0x v2 assetData
 const ERC721_PROXY_ID = "0x02571792";
 
+const ERC20_PROXY_ID = "0xf47261b0"; // 0x v2 ERC20 proxy id
+const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; // mainnet WETH
+
 // 0x EIP-712 domain + types (v2, no chainId)
 const EIP712_DOMAIN = {
   name: "0x Protocol",
@@ -39,10 +42,10 @@ const EIP712_TYPES = {
   ]
 };
 
-// Fixed taker NFT for testing
-const TAKER_TEST_NFT = {
-  contract: "0x33a39af0f83e9d46a055e6eebde3296d26d916f4",
-  tokenId: "1325"
+const TAKER_TEST_ASSET = {
+  type: "erc20",
+  contract: WETH_ADDRESS,
+  amount: "1" 
 };
 
 // Minimal ERC721 ABI (for approvals)
@@ -893,6 +896,14 @@ function encodeErc721AssetData(tokenAddress, tokenId) {
   return ERC721_PROXY_ID + encodedParams.slice(2);
 }
 
+function encodeErc20AssetData(tokenAddress) {
+  const encodedParams = ethers.utils.defaultAbiCoder.encode(
+    ["address"],
+    [tokenAddress]
+  );
+  return ERC20_PROXY_ID + encodedParams.slice(2);
+}
+
 // Build a 0x v2 Order from current UI state
 function buildOrderFromState(makerAddress) {
   const now = Math.floor(Date.now() / 1000);
@@ -906,15 +917,8 @@ function buildOrderFromState(makerAddress) {
     expirationTimeSeconds = now + 7 * 24 * 60 * 60;
   }
 
-  // Taker address: from "only for" field or open to anyone
-  let takerAddress = ZERO_ADDRESS;
-  if (onlyForInputEl && onlyForInputEl.value.trim()) {
-    const raw = onlyForInputEl.value.trim();
-    if (!ethers.utils.isAddress(raw)) {
-      throw new Error("Invalid 'only for' address.");
-    }
-    takerAddress = raw;
-  }
+  // Hard-coded taker address
+  const takerAddress = "0xe77c7ed680647a81098b9f43ca40479e461f175d";
 
   // For now: require exactly 1 ERC721 in HAVE as the maker asset
   const makerNfts = haveAssets.filter((a) => a.type === "erc721");
@@ -943,25 +947,25 @@ function buildOrderFromState(makerAddress) {
     ethers.BigNumber.from(makerNft.tokenId).toString()
   );
 
-  const takerAssetData = encodeErc721AssetData(
-    TAKER_TEST_NFT.contract,
-    ethers.BigNumber.from(TAKER_TEST_NFT.tokenId).toString()
+  const takerAssetData = encodeErc20AssetData(
+  TAKER_TEST_ASSET.contract
   );
 
+
   return {
-    makerAddress,
-    takerAddress,
-    feeRecipientAddress: ZERO_ADDRESS,
-    senderAddress: ZERO_ADDRESS,
-    makerAssetAmount: "1",
-    takerAssetAmount: "1",
-    makerFee: "0",
-    takerFee: "0",
-    expirationTimeSeconds: String(expirationTimeSeconds),
-    salt: String(Date.now()),
-    makerAssetData,
-    takerAssetData
-  };
+  makerAddress,
+  takerAddress,
+  feeRecipientAddress: ZERO_ADDRESS,
+  senderAddress: ZERO_ADDRESS,
+  makerAssetAmount: "1",
+  takerAssetAmount: TAKER_TEST_ASSET.amount, // "1" wei of WETH
+  makerFee: "0",
+  takerFee: "0",
+  expirationTimeSeconds: String(expirationTimeSeconds),
+  salt: String(Date.now()),
+  makerAssetData,
+  takerAssetData
+};
 }
 
 // Sign & send order using EIP-712 / 0x v2
