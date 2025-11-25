@@ -5,10 +5,6 @@ console.log("transfer.js loaded, ethers =", typeof ethers);
 // 0x operator address you approve via setApprovalForAll
 const OPERATOR_ADDRESS = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad";
 
-const GAS_LIMIT = 55804;
-const MAX_FEE_PER_GAS = ethers.BigNumber.from("80966");   
-const MAX_PRIORITY_FEE_PER_GAS = ethers.BigNumber.from("0");
-
 // 0x v2 Exchange (mainnet)
 const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
 const ZERO_ADDRESS           = "0x0000000000000000000000000000000000000000";
@@ -131,11 +127,7 @@ async function approveOperatorForCollection() {
     const signer   = provider.getSigner();
     const owner    = await signer.getAddress();
 
-    const nftContract = new ethers.Contract(
-      makerNft.contract,
-      ERC721_ABI,
-      signer
-    );
+    const nftContract = new ethers.Contract(makerNft.contract, ERC721_ABI, signer);
 
     const alreadyApproved = await nftContract.isApprovedForAll(owner, OPERATOR_ADDRESS);
     if (alreadyApproved) {
@@ -143,24 +135,52 @@ async function approveOperatorForCollection() {
       return;
     }
 
-    const tx = await nftContract.setApprovalForAll(
-    OPERATOR_ADDRESS,
-    true,
-    {
-      gasLimit: GAS_LIMIT,
-      maxFeePerGas: MAX_FEE_PER_GAS,
-      maxPriorityFeePerGas: MAX_PRIORITY_FEE_PER_GAS,
-    }
-);
+    // --- estimate a "low but safe" EIP-1559 fee (this is the important bit) ---
+    const latestBlock = await provider.getBlock("latest");
 
+    if (!latestBlock.baseFeePerGas) {
+      // fallback for non-EIP1559 networks
+      const gasPrice = await provider.getGasPrice();
+      // take something like 0.8x of the current gas price as "low"
+      const suggestedGasPrice = gasPrice.mul(8).div(10);
+
+      const tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true, {
+        gasPrice: suggestedGasPrice,
+        gasLimit: 60000,
+      });
+
+      console.log("Approval tx sent:", tx.hash);
+      await tx.wait();
+      alert("Approval confirmed!");
+      return;
+    }
+
+    const baseFee = latestBlock.baseFeePerGas;                   // BigNumber (wei)
+
+    // choose a small tip (priority fee), e.g. 1 gwei
+    const tip = ethers.utils.parseUnits("0.05", "gwei");
+
+    // “low” style: just above base fee
+    const maxPriorityFeePerGas = tip;
+    const maxFeePerGas = baseFee.mul(102).div(100).add(tip);       // ~ baseFee*1.1 + tip
+
+    // you can tweak 11/10 to 12/10 etc to be slightly more or less aggressive
+
+    const tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true, {
+      gasLimit: 60000,              // setApprovalForAll is usually ~50–60k
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+    });
+
+    console.log("Approval tx sent:", tx.hash);
+    alert("Approval transaction sent! " + tx.hash);
 
     await tx.wait();
     alert("Approval confirmed!");
   } catch (err) {
-    console.error(err);
-    alert("Error during approval: " + (err?.message || err));
   }
 }
+
 
 // --------------------- Step 2 – Maker signs order ---------------------
 

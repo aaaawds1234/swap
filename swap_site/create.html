@@ -699,26 +699,48 @@ header h1 {
       <div class="modal-header">
         <div class="modal-tabs">
           <button class="modal-tab-btn active" data-tab="nfts">NFTs</button>
+          <button class="modal-tab-btn" data-tab="address">Search</button>
           <button class="modal-tab-btn" data-tab="tokens">Tokens</button>
           <button class="modal-tab-btn" data-tab="custom">Custom Asset</button>
         </div>
         <button class="modal-close-btn" id="asset-modal-close">x</button>
       </div>
 
-      <div class="modal-body">
+       <div class="modal-body">
         <!-- NFTs TAB -->
         <div id="tab-nfts" class="tab-panel active">
-          <p style="font-size: 12px; margin-bottom: 10px;">
-            Loading NFTs for your wallet… <span id="nft-loading-text"></span>
-          </p>
-          <div id="nft-picker-grid" class="nft-picker-grid"></div>
-          <div class="nft-picker-footer">
+          <div class="nft-picker-footer" style="text-align:right; margin-bottom:8px;">
             <button id="add-selected-nfts-btn" class="modal-footer-btn" disabled>
               Add 0 NFTs
             </button>
           </div>
+
+          <p style="font-size: 12px; margin-bottom: 10px;">
+            <span id="nft-loading-text"></span>
+          </p>
+
+          <div id="nft-picker-grid" class="nft-picker-grid"></div>
+
           <p class="helper-text" style="margin-top:8px;">
             Can’t find your NFT? Use the <strong>Custom Asset</strong> tab.
+          </p>
+        </div>
+
+        <!-- THEIR NFTs TAB -->
+        <div id="tab-address" class="tab-panel">
+          <div class="address-input-row" style="margin-bottom:10px;">
+            <input
+              id="address-nft-input"
+              type="text"
+              placeholder="0x1234…"
+              style="width: 70%;"
+            />
+            <button id="address-nft-load-btn" class="modal-footer-btn">
+              Load NFTs
+            </button>
+          </div>
+          <p class="helper-text">
+            Enter any Ethereum address to load its NFTs.
           </p>
         </div>
 
@@ -749,22 +771,16 @@ header h1 {
             <label for="customTypeSelect">Asset Type</label>
             <select id="customTypeSelect">
               <option value="erc721">ERC721</option>
-              <option value="erc1155">ERC1155</option>
-              <option value="erc20">ERC20</option>
             </select>
 
             <label for="customAddressInput">Asset Address</label>
             <input id="customAddressInput" type="text" placeholder="Asset address (0x…)" />
 
-            <label for="customIdInput">IDs / Amount</label>
+            <label for="customIdInput">ID</label>
             <input id="customIdInput" type="text" placeholder="ID or amount" />
 
             <button id="customSubmitBtn" type="button">Submit</button>
           </div>
-
-          <p class="helper-text">
-            For ERC721/1155, “IDs / Amount” can be a single ID (e.g. <code>12923</code>) for now.
-          </p>
         </div>
       </div>
     </div>

@@ -1,35 +1,47 @@
-import { neon } from "@netlify/neon";
+// netlify/functions/save-order.js
 
-export const handler = async (event) => {
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
+const APP_BASE_URL = process.env.APP_BASE_URL; // e.g. "https://your-site.netlify.app"
+
+export async function handler(event) {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
+    return { statusCode: 405, body: "Method not allowed" };
+  }
+
+  if (!DISCORD_WEBHOOK || !APP_BASE_URL) {
+    console.error("Missing DISCORD_WEBHOOK_URL or APP_BASE_URL env var");
+    return { statusCode: 500, body: "Server not configured" };
   }
 
   try {
     const { order, signature } = JSON.parse(event.body || "{}");
-
     if (!order || !signature) {
       return { statusCode: 400, body: "Missing order or signature" };
     }
 
-    // Simple unique ID for the URL
-    const orderId = Date.now().toString();
+    // Pack everything the taker needs
+    const payload = { order, signature };
 
-    // Connect to your Netlify DB (Neon) using the env var Netlify set up
-    const sql = neon(process.env.NETLIFY_DATABASE_URL);
+    // Encode payload into the URL hash so it never touches your server on load
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const link = `${APP_BASE_URL}/load.html#${encoded}`;
 
-    await sql`
-      INSERT INTO orders (order_id, order_json, signature)
-      VALUES (${orderId}, ${JSON.stringify(order)}, ${signature});
-    `;
+    // Send to Discord
+    await fetch(DISCORD_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: `🆕 **New swap created!**\n${link}`
+      })
+    });
 
+    // Also return link to the browser (optional, nice for UX)
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: orderId }),
+      body: JSON.stringify({ link })
     };
   } catch (err) {
-    console.error("save-order ERROR:", err);
-    return { statusCode: 500, body: "Server error" };
+    console.error("save-order error:", err);
+    return { statusCode: 500, body: "Internal Error" };
   }
-};
+}
