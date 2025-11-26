@@ -272,6 +272,28 @@ function renderAll() {
   updateCreateButtonState();
 }
 
+const tradeCodeSection = document.getElementById("trade-code-section");
+const tradeCodeDisplay = document.getElementById("tradeCodeDisplay");
+const tradeCodeHint = document.getElementById("tradeCodeHint");
+
+if (tradeCodeDisplay && tradeCodeHint) {
+  tradeCodeDisplay.addEventListener("click", async () => {
+    const code = tradeCodeDisplay.textContent.trim();
+    if (!code) return;
+
+    try {
+      await navigator.clipboard.writeText(code);
+      const oldText = tradeCodeHint.textContent;
+      tradeCodeHint.textContent = "Copied!";
+      setTimeout(() => {
+        tradeCodeHint.textContent = oldText;
+      }, 1500);
+    } catch (err) {
+      console.error("Clipboard copy failed:", err);
+    }
+  });
+}
+
 // ---------------- Rendering asset cards ----------------
 
 function renderSide(side, assets, containerEl) {
@@ -363,6 +385,56 @@ function renderSide(side, assets, containerEl) {
     btnRow.appendChild(removeBtn);
 
     right.appendChild(btnRow);
+        // small icon links row (OpenSea / Etherscan)
+    const linksRow = document.createElement("div");
+    linksRow.className = "asset-links-row";
+
+    // OpenSea link for ERC721
+    if (
+      asset.type === "erc721" &&
+      asset.contract &&
+      asset.tokenId != null
+    ) {
+      const osLink = document.createElement("a");
+      osLink.href = `https://opensea.io/assets/ethereum/${asset.contract}/${asset.tokenId}`;
+      osLink.target = "_blank";
+      osLink.rel = "noopener noreferrer";
+      osLink.title = "View on OpenSea";
+
+      const osIcon = document.createElement("img");
+      osIcon.src = "OpenSea_icon.svg";      // make sure path is correct
+      osIcon.alt = "OpenSea";
+      osIcon.className = "asset-link-icon";
+
+      osLink.appendChild(osIcon);
+      linksRow.appendChild(osLink);
+    }
+
+    // Etherscan link for WETH (ERC20)
+    if (
+      asset.type === "erc20" &&
+      asset.contract &&
+      asset.contract.toLowerCase() === WETH_ADDRESS.toLowerCase()
+    ) {
+      const esLink = document.createElement("a");
+      esLink.href = `https://etherscan.io/token/${asset.contract}`;
+      esLink.target = "_blank";
+      esLink.rel = "noopener noreferrer";
+      esLink.title = "View WETH contract on Etherscan";
+
+      const esIcon = document.createElement("img");
+      esIcon.src = "etherscan-logo.svg";    // make sure path is correct
+      esIcon.alt = "Etherscan";
+      esIcon.className = "asset-link-icon";
+
+      esLink.appendChild(esIcon);
+      linksRow.appendChild(esLink);
+    }
+
+    if (linksRow.childElementCount > 0) {
+      right.appendChild(linksRow);
+    }
+
     card.appendChild(right);
 
     containerEl.appendChild(card);
@@ -424,8 +496,6 @@ async function handleApproveClick(asset, btnEl) {
 
     renderAll();
   } catch (err) {
-    console.error("approve failed", err);
-    alert("Error while approving asset: " + (err?.message || err));
     updateApproveBtnLabel(btnEl, asset.approved);
     btnEl.disabled = false;
   }
@@ -814,15 +884,17 @@ document.getElementById("add-eth-btn").addEventListener("click", () => {
 
   const list = currentSideForModal === "have" ? haveAssets : wantAssets;
 
-  list.push({
-    id: "asset-" + nextAssetId++,
-    side: currentSideForModal,
-    type: "erc20",
-    amount,
-    name: "Ether (Wrapped)",
-    imageUrl: "eth.png",
-    approved: false
-  });
+list.push({
+  id: "asset-" + nextAssetId++,
+  side: currentSideForModal,
+  type: "erc20",
+  contract: WETH_ADDRESS,          
+  amount,
+  name: "Ether (Wrapped)",
+  imageUrl: "eth.png",
+  approved: false
+});
+
 
   input.value = "";
   renderAll();
@@ -1017,12 +1089,18 @@ async function signAndSaveOrderFromState() {
     console.warn("verifyTypedData sanity check failed:", e);
   }
 
-  // Send to backend (Netlify function -> Discord)
+    // Send to backend (Netlify function -> Discord)
   try {
+    // generate a random 8-digit trade code
+    const tradeCode = String(
+      Math.floor(10000000 + Math.random() * 90000000)
+    );
+
     const res = await fetch("/.netlify/functions/save-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order, signature })
+      // include tradeCode in case your backend wants to store it
+      body: JSON.stringify({ order, signature, tradeCode })
     });
 
     if (!res.ok) {
@@ -1034,15 +1112,17 @@ async function signAndSaveOrderFromState() {
 
     const { link } = await res.json();
     console.log("Swap link:", link);
+    console.log("Trade code:", tradeCode);
 
-    alert(
-      "Order signed & sent to Discord!\n\n" +
-        "You can also share this link directly with the taker:\n\n" +
-        link
-    );
+    // Show the trade code on the page instead of alert
+    if (tradeCodeDisplay && tradeCodeSection) {
+      tradeCodeDisplay.textContent = tradeCode;
+      tradeCodeSection.style.display = "block";
+      // scroll into view if you like:
+      tradeCodeSection.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   } catch (saveErr) {
     console.error("Error calling save-order:", saveErr);
-    alert("Order signed, but error sending to Discord.");
   }
 }
 

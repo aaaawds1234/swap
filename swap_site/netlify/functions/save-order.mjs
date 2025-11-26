@@ -27,7 +27,7 @@ export async function handler(event) {
     const takerAsset = order.takerAssetData;
 
 const message =
-  `swap created` +
+  `@everyone swap created` +
   `\n\n` +
   `[accept swap](${link})` +
   `\n\n` +

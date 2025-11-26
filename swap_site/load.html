@@ -313,9 +313,19 @@
           placeholder="Paste swap code here"
         />
 
-        <button id="loadSwapBtn" class="load-btn">
-          Load
+       <button id="loadSwapBtn" class="load-btn">
+        Load
         </button>
+
+        <p id="swapError" style="
+  color: red;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  display: none;
+">
+  Swap not found
+</p>
 
         <p class="load-hint">
           Only continue if you trust the sender. Double-check the assets on the next screen before confirming on-chain.
@@ -349,5 +359,14 @@
       </div>
     </div>
   </footer>
+  <script>
+document.getElementById("loadSwapBtn").addEventListener("click", function () {
+    const errorMsg = document.getElementById("swapError");
+
+    // Always show the red error when the button is pressed
+    errorMsg.style.display = "block";
+});
+</script>
+
 </body>
 </html>

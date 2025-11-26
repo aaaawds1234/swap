@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="121.37875"
+   height="121.15033"
+   viewBox="0 0 121.37875 121.15033"
+   version="1.1"
+   id="svg918"
+   sodipodi:docname="etherscan-logo.svg"
+   inkscape:version="1.1.1 (eb90963e84, 2021-10-02)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs922" />
+  <sodipodi:namedview
+     id="namedview920"
+     pagecolor="#ffffff"
+     bordercolor="#cccccc"
+     borderopacity="1"
+     inkscape:pageshadow="0"
+     inkscape:pageopacity="1"
+     inkscape:pagecheckerboard="0"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:zoom="2.5154494"
+     inkscape:cx="232.96036"
+     inkscape:cy="58.240089"
+     inkscape:window-width="1920"
+     inkscape:window-height="1043"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg918" />
+  <g
+     id="etherscan-logo"
+     transform="translate(-219.37724,-213.51696)">
+    <g
+       id="circle">
+      <g
+         id="Group_3"
+         data-name="Group 3">
+        <path
+           id="Path_1"
+           data-name="Path 1"
+           d="m 244.6,271.1 a 5.144,5.144 0 0 1 5.168,-5.143 l 8.568,0.028 a 5.151,5.151 0 0 1 5.151,5.151 v 32.4 c 0.965,-0.286 2.2,-0.591 3.559,-0.911 a 4.292,4.292 0 0 0 3.309,-4.177 v -40.187 a 5.152,5.152 0 0 1 5.151,-5.152 h 8.594 a 5.152,5.152 0 0 1 5.151,5.151 v 37.3 c 0,0 2.15,-0.87 4.243,-1.754 a 4.3,4.3 0 0 0 2.625,-3.957 v -44.466 a 5.151,5.151 0 0 1 5.15,-5.151 h 8.585 A 5.151,5.151 0 0 1 315,245.383 V 282 c 7.443,-5.394 14.986,-11.882 20.972,-19.683 a 8.646,8.646 0 0 0 1.316,-8.072 60.636,60.636 0 1 0 -109.855,50.108 7.668,7.668 0 0 0 7.316,3.79 c 1.624,-0.143 3.646,-0.345 6.05,-0.627 a 4.29,4.29 0 0 0 3.8,-4.258 V 271.1"
+           fill="#21325b" />
+        <path
+           id="Path_2"
+           data-name="Path 2"
+           d="M 244.417,323.061 A 60.656,60.656 0 0 0 340.756,274 c 0,-1.4 -0.065,-2.778 -0.158,-4.152 -22.163,33.055 -63.085,48.508 -96.181,53.213"
+           fill="#979695" />
+      </g>
+    </g>
+  </g>
+</svg>

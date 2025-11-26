@@ -261,6 +261,23 @@ header h1 {
       margin-bottom: 6px;
     }
 
+    .asset-links-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.asset-links-row a {
+  display: inline-flex;
+}
+
+.asset-link-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
     .tag {
       display: inline-flex;
       align-items: center;
@@ -691,6 +708,36 @@ header h1 {
         You’ll be able to create the swap once all assets you’re sending are approved.
       </div>
     </section>
+
+    <section id="trade-code-section" style="margin-top:32px; text-align:center; display:none;">
+  <div style="font-weight:600; margin-bottom:6px;">
+    Your trade code is:
+  </div>
+
+  <div
+    id="tradeCodeDisplay"
+    style="
+      font-family: 'Consolas', monospace;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+      padding: 12px 16px;
+      display: inline-block;
+      border: 1px solid #111;
+      background: #fff;
+      cursor: pointer;
+    "
+  >
+    <!-- code inserted by JS -->
+  </div>
+
+  <div
+    id="tradeCodeHint"
+    style="font-size:12px; color:#4b5563; margin-top:4px;"
+  >
+    (click to copy)
+  </div>
+</section>
+
   </main>
 
   <!-- ASSET PICKER MODAL -->
