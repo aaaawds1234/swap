@@ -17,49 +17,31 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: "Poppins", sans-serif;
       background: #ffffff;
       color: #111827;
     }
 
-    :root {
-      --pink: #f9a8d4;
-      --pink-dark: #f472b6;
-      --mint: #a7f3d0;
-      --border-soft: #e5e7eb;
-      --bg-main: #ffffff;
-      --card-bg: #f9fafb;
-      --text-main: #111827;
-    }
-
     main { flex: 1; }
 
-    /* ---------- HEADER (copied from create.html) ---------- */
-
+    /* HEADER — same as create.html */
     header {
       background: #eef3fb;
       padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      color: #111;
       position: sticky;
       top: 0;
       z-index: 50;
       border-bottom: 1px solid #d1d5db;
     }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 28px;
-    }
+    .header-left { display: flex; align-items: center; gap: 28px; }
 
     .logo-link img {
       height: 40px;
       width: auto;
-      object-fit: contain;
-      display: block;
     }
 
     .top-nav {
@@ -69,24 +51,23 @@
     }
 
     .nav-link {
-      position: relative;
       padding: 6px 12px;
       border-radius: 999px;
       font-size: 13px;
       font-weight: 500;
-      color: #111827;
       text-decoration: none;
-      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+      color: #111827;
+      transition: 0.18s ease;
     }
 
     .nav-link:hover {
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
     }
 
     .nav-link.active {
       background: #ffffff;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+      box-shadow: 0 2px 6px rgba(0,0,0,.12);
     }
 
     #connect-wallet-btn {
@@ -107,15 +88,13 @@
       background: #ff2fae;
     }
 
-    /* ---------- MAIN LAYOUT ---------- */
+    /* ---------- HERO ---------- */
 
     main {
       max-width: 1120px;
       margin: 32px auto 60px;
       padding: 0 18px 40px;
     }
-
-    /* ---------- HERO ---------- */
 
     .hero {
       margin: 50px auto 40px;
@@ -199,16 +178,16 @@
       margin: 0 14px;
     }
 
-    /* ---------- FEATURE CARDS ---------- */
+    /* ---------- FEATURE CARDS (new, replaces preview box) ---------- */
 
     .features {
-      margin: 40px auto 0;
+      margin: 40px auto 20px;
       max-width: 900px;
       text-align: center;
     }
 
     .features-title {
-      font-family: "Consolas", serif;
+      font-family: "Playfair Display", serif;
       font-size: 22px;
       margin-bottom: 8px;
     }
@@ -233,15 +212,8 @@
       text-align: left;
       font-size: 13px;
     }
-    .x0 {
-      font-family: "Consolas", serif;
-      font-size: 15px;
-      font-weight: 600;
-      text-decoration: underline;
-    }
 
     .feature-title {
-      font-family: "Consolas";
       font-weight: 600;
       margin-bottom: 6px;
       font-size: 14px;
@@ -259,12 +231,12 @@
       }
     }
 
-    /* ---------- FOOTER (copied from create.html) ---------- */
+    /* ---------- FOOTER ---------- */
 
     .swap-footer {
       margin-top: auto;
       padding: 18px 32px;
-      border-top: 2px solid var(--pink);
+      border-top: 2px solid #f9a8d4;
       background: #fdfcfb;
     }
 
@@ -287,38 +259,21 @@
     }
 
     .footer-links a {
-      display: flex;
-      align-items: center;
-      gap: 6px;
       color: #1f2937;
       font-weight: 500;
       text-decoration: none;
-      line-height: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .footer-links a:hover {
-      color: var(--pink-dark);
-    }
+    .footer-links a:hover { color: #f472b6; }
 
     .footer-icon {
       width: 22px;
       height: 22px;
-      fill: #111827;
-      flex-shrink: 0;
-      transition: opacity .15s ease, transform .15s ease;
+      fill: #111;
     }
-    .home-logo-wrapper {
-  text-align: center;
-  margin-top: 50px;
-  margin-bottom: 20px;
-}
-
-.home-logo {
-  height: 90px;        /* adjust size here */
-  width: auto;
-  opacity: 0.9;        /* optional: softens it slightly */
-}
-
   </style>
 </head>
 
@@ -326,10 +281,7 @@
 <header>
   <div class="header-left">
     <a href="home.html" class="logo-link">
-      <img
-        src="https://www.pngall.com/wp-content/uploads/10/0x-Protocol-Crypto-Logo-PNG-File.png"
-        alt="0xswap logo"
-      >
+      <img src="https://www.pngall.com/wp-content/uploads/10/0x-Protocol-Crypto-Logo-PNG-File.png" alt="0xswap logo">
     </a>
 
     <nav class="top-nav">
@@ -343,10 +295,6 @@
 </header>
 
 <main>
-  <div class="home-logo-wrapper">
-  <img src="0x2.png" alt="0xswap logo" class="home-logo">
-</div>
-
   <!-- HERO -->
   <section class="hero">
     <div class="hero-eyebrow">swap anything · for anything</div>
@@ -372,7 +320,7 @@
     </div>
   </section>
 
-  <!-- FEATURES -->
+  <!-- FEATURES (replaces preview swap) -->
   <section class="features">
     <p class="features-subtitle">
       Built for simple, direct trades between collectors, friends, and communities.
@@ -403,33 +351,27 @@
         </p>
       </article>
     </div>
-    <p class="x0" href="">
-      Powered by 0x Protocol
-    </p>
   </section>
 </main>
 
 <footer class="swap-footer">
   <div class="footer-inner">
-
-    <!-- LEFT SIDE -->
     <span class="footer-brand">0xswap © 2025</span>
 
-    <!-- RIGHT SIDE -->
     <div class="footer-links">
-      <a href="https://x.com/0xswap_io" target="_blank" aria-label="Twitter">
+      <a href="https://x.com/0xswap_io" target="_blank">
         <svg class="footer-icon" viewBox="0 0 41 41">
-          <path d="M28.2 8h4.6L22.5 19l11.5 15H25.6L18.7 24.5 10.5 34H5.9L16.1 22.1 5.1 8h10.8l6.1 7.6L28.2 8zm-2 24h2.1L11.1 10H8.7L26.2 32z"></path>
+          <path d="M28.2 8h4.6L22.5 19l11.5 15H25.6L18.7 24.5 10.5 34H5.9L16.1 22.1 5.1 8h10.8l6.1 7.6L28.2 8zm-2 24h2.1L11.1 10H8.7L26.2 32z"/>
         </svg>
       </a>
 
-      <a href="https://discord.gg/0xswap" target="_blank" aria-label="Discord">
+      <a href="https://discord.gg/0xswap" target="_blank">
         <svg class="footer-icon" viewBox="0 0 41 41">
-          <path d="M32.3019 11.3373C30.1352 10.354 27.8186 9.6373 25.4186 9.2373C25.1186 9.75397 24.7852 10.454 24.5519 11.004C21.9852 10.6373 19.4519 10.6373 16.9186 11.004C16.6852 10.454 16.3352 9.75397 16.0519 9.2373C13.6352 9.6373 11.3186 10.354 9.16857 11.3373C4.8019 17.704 3.61856 23.9206 4.21856 30.054C7.11856 32.1373 9.91858 33.404 12.6686 34.2373C13.3352 33.3373 13.9519 32.3706 14.4686 31.354C13.4686 30.9873 12.5186 30.5373 11.6186 30.004C11.8519 29.8373 12.0852 29.654 12.3019 29.4707C17.7852 31.954 23.7519 31.954 29.1686 29.4707C29.4019 29.654 29.6186 29.8373 29.8519 30.004C28.9519 30.5373 28.0019 30.9873 27.0019 31.354C27.5185 32.3706 28.1352 33.3373 28.8019 34.2373C31.5519 33.404 34.3686 32.1373 37.2519 30.054C37.9852 22.954 36.1019 16.7873 32.3352 11.3373H32.3019ZM15.1852 26.1873C13.5352 26.1873 12.1852 24.6873 12.1852 22.854C12.1852 21.0207 13.5019 19.5207 15.1852 19.5207C16.8685 19.5207 18.2186 21.0207 18.1852 22.854C18.1852 24.6873 16.8519 26.1873 15.1852 26.1873ZM26.2519 26.1873C24.6019 26.1873 23.2519 24.6873 23.2519 22.854C23.2519 21.0207 24.5686 19.5207 26.2519 19.5207C27.9352 19.5207 29.2852 21.0207 29.2519 22.854C29.2519 24.6873 27.9352 26.1873 26.2519 26.1873Z"></path>
+          <path d="M32.3019 11.3373C30.1352 10.354 27.8186 9.6373 25.4186 9.2373C25.1186 9.75397 24.7852 10.454 24.5519 11.004C21.9852 10.6373 19.4519 10.6373 16.9186 11.004C16.6852 10.454 16.3352 9.75397 16.0519 9.2373C13.6352 9.6373 11.3186 10.354 9.16857 11.3373C4.8019 17.704 3.61856 23.9206 4.21856 30.054C7.11856 32.1373 9.91858 33.404 12.6686 34.2373C13.3352 33.3373 13.9519 32.3706 14.4686 31.354C13.4686 30.9873 12.5186 30.5373 11.6186 30.004C11.8519 29.8373 12.0852 29.654 12.3019 29.4707C17.7852 31.954 23.7519 31.954 29.1686 29.4707C29.4019 29.654 29.6186 29.8373 29.8519 30.004C28.9519 30.5373 28.0019 30.9873 27.0019 31.354C27.5185 32.3706 28.1352 33.3373 28.8019 34.2373C31.5519 33.404 34.3686 32.1373 37.2519 30.054C37.9852 22.954 36.1019 16.7873 32.3352 11.3373H32.3019ZM15.1852 26.1873C13.5352 26.1873 12.1852 24.6873 12.1852 22.854C12.1852 21.0207 13.5019 19.5207 15.1852 19.5207C16.8685 19.5207 18.2186 21.0207 18.1852 22.854C18.1852 24.6873 16.8519 26.1873 15.1852 26.1873ZM26.2519 26.1873C24.6019 26.1873 23.2519 24.6873 23.2519 22.854C23.2519 21.0207 24.5686 19.5207 26.2519 19.5207C27.9352 19.5207 29.2852 21.0207 29.2519 22.854C29.2519 24.6873 27.9352 26.1873 26.2519 26.1873Z"/>
         </svg>
       </a>
 
-      <a href="#" target="_blank">Docs</a>
+      <a href="#">Docs</a>
       <a href="https://etherscan.io/address/0x080bf510fcbf18b91105470639e9561022937712" target="_blank">0x V2.1</a>
     </div>
   </div>

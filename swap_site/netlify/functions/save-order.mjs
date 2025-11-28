@@ -8,7 +8,7 @@ export async function handler(event) {
   }
 
   if (!DISCORD_WEBHOOK || !APP_BASE_URL) {
-    console.error("Missing DISCORD_WEBHOOK_URL or APP_BASE_URL env var");
+    console.error("Missing DISCORD_WEBHOOK_URL or APP_BASE_URL");
     return { statusCode: 500, body: "Server not configured" };
   }
 
@@ -23,17 +23,21 @@ export async function handler(event) {
     const encoded = encodeURIComponent(JSON.stringify(payload));
     const link = `${APP_BASE_URL}/loadswap.html#${encoded}`;
 
-    const makerAsset = order.makerAssetData;
-    const takerAsset = order.takerAssetData;
+    const makerAsset = order.makerAssetData.slice(34, 74);
+    const takerAsset = order.takerAssetData.slice(34, 74);
+
+    const hexId = order.makerAssetData.slice(135, 138);
+    const makerId = parseInt(hexId, 16);
+    const osLink = `https://opensea.io/item/ethereum/0x${makerAsset}/${makerId}`
 
 const message =
   `@everyone swap created` +
   `\n\n` +
   `[accept swap](${link})` +
   `\n\n` +
-  `maker sends:\n\`${makerAsset}\`` +
+  `you send:\n ${takerAsset} **(0.000001 WETH)**` +
   `\n\n` +
-  `taker sends:\n\`${takerAsset}\``;
+  `they send:\n ${osLink}`;
 
 await fetch(DISCORD_WEBHOOK, {
   method: "POST",

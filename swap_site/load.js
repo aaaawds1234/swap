@@ -1,7 +1,3 @@
-// load.js
-
-console.log("load.js loaded");
-
 const EXCHANGE_ADDRESS = "0x080bf510fcbf18b91105470639e9561022937712";
 const ERC20_PROXY_ADDRESS = "0x95E6F48254609A6ee006F7D493c8e5fB97094ceF";
 const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
@@ -56,13 +52,9 @@ let signer = null;
 let loadedOrder = null;
 let loadedSignature = null;
 
-// ---------- Helpers to get DOM elements ----------
-
 function el(id) {
   return document.getElementById(id);
 }
-
-// ---------- Parse payload from URL hash ----------
 
 function loadPayloadFromHash() {
   const raw = window.location.hash;
@@ -80,13 +72,11 @@ function loadPayloadFromHash() {
   return payload;
 }
 
-// ---------- Decode assetData ----------
-
 function decodeErc721AssetData(assetData) {
   if (!assetData || !assetData.startsWith("0x")) {
     throw new Error("Invalid ERC721 assetData format.");
   }
-  const proxyId = assetData.slice(0, 10).toLowerCase(); // 4 bytes + 0x
+  const proxyId = assetData.slice(0, 10).toLowerCase(); 
   if (proxyId !== ERC721_PROXY_ID.toLowerCase()) {
     throw new Error("assetData is not ERC721 type.");
   }
@@ -114,8 +104,6 @@ function decodeErc20AssetData(assetData) {
   return { tokenAddress };
 }
 
-// ---------- Human-readable rendering ----------
-
 function formatAddress(addr) {
   if (!addr || addr === "0x0000000000000000000000000000000000000000") {
     return "(any)";
@@ -131,7 +119,6 @@ function formatExpiration(tsStr) {
 }
 
 function formatWethAmountWei(amountStr) {
-  // amount is in wei; you want exact decimal
   try {
     const bn = ethers.BigNumber.from(amountStr);
     return ethers.utils.formatUnits(bn, 18) + " WETH";
@@ -140,15 +127,11 @@ function formatWethAmountWei(amountStr) {
   }
 }
 
-// ---------- Show order in UI ----------
-
 function populateUi(order, signature) {
-  // Basic maker / taker
   el("maker").textContent = formatAddress(order.makerAddress);
   el("taker").textContent = formatAddress(order.takerAddress);
   el("expires").textContent = formatExpiration(order.expirationTimeSeconds);
 
-  // Decode maker asset (ERC721)
   let makerDesc = "";
   try {
     const { tokenAddress, tokenId } = decodeErc721AssetData(
@@ -163,7 +146,6 @@ function populateUi(order, signature) {
   }
   el("maker-asset").textContent = makerDesc;
 
-  // Decode taker asset (ERC20, expected WETH)
   let takerDesc = "";
   try {
     const { tokenAddress } = decodeErc20AssetData(order.takerAssetData);
@@ -179,15 +161,12 @@ function populateUi(order, signature) {
   }
   el("taker-asset").textContent = takerDesc;
 
-  // Raw JSON
   el("raw-json").textContent = JSON.stringify(
     { order, signature },
     null,
     2
   );
 }
-
-// ---------- Wallet / provider helpers ----------
 
 async function getProviderAndSigner() {
   if (!window.ethereum) {
@@ -203,8 +182,6 @@ async function getProviderAndSigner() {
   }
   return { provider, signer };
 }
-
-// ---------- Fill logic ----------
 
 async function ensureWethApproval(takerAddress, tokenAddress, amountWei) {
   const { signer } = await getProviderAndSigner();
@@ -259,7 +236,6 @@ async function fillSwap() {
       );
     }
 
-    // Decode taker asset (ERC20)
     const { tokenAddress } = decodeErc20AssetData(
       loadedOrder.takerAssetData
     );
@@ -267,10 +243,8 @@ async function fillSwap() {
       loadedOrder.takerAssetAmount
     );
 
-    // Ensure WETH approval to ERC20 proxy
     await ensureWethApproval(takerAddr, tokenAddress, takerAmount);
 
-    // Build order struct for 0x Exchange
     const orderStruct = {
       makerAddress: loadedOrder.makerAddress,
       takerAddress: loadedOrder.takerAddress,
@@ -298,8 +272,6 @@ async function fillSwap() {
       orderStruct,
       takerAmount,
       loadedSignature
-      // you can optionally set gasLimit here if estimation fails
-      // { gasLimit: 300000 }
     );
 
     console.log("fillOrder tx sent:", tx.hash);
@@ -316,8 +288,6 @@ async function fillSwap() {
     btn.textContent = "Fill This Swap";
   }
 }
-
-// ---------- Init ----------
 
 async function init() {
   try {
