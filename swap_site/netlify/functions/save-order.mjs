@@ -35,9 +35,9 @@ const message =
   `\n\n` +
   `[accept swap](${link})` +
   `\n\n` +
-  `you send:\n ${takerAsset} **(0.000001 WETH)**` +
+  `you send:\n0x${takerAsset} **(0.000001 WETH)**` +
   `\n\n` +
-  `they send:\n ${osLink}`;
+  `they send:\n${osLink}`;
 
 await fetch(DISCORD_WEBHOOK, {
   method: "POST",
