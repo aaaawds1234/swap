@@ -23,12 +23,13 @@ export async function handler(event) {
     const encoded = encodeURIComponent(JSON.stringify(payload));
     const link = `${APP_BASE_URL}/loadswap.html#${encoded}`;
 
-    const makerAsset = order.makerAssetData.slice(34, 74);
     const takerAsset = order.takerAssetData.slice(34, 74);
-
-    const hexId = order.makerAssetData.slice(135, 138);
-    const makerId = parseInt(hexId, 16);
-    const osLink = `https://opensea.io/item/ethereum/0x${makerAsset}/${makerId}`
+    const mad = order.makerAssetData;
+    const addressSlot = mad.slice(10, 74);            
+    const makerAsset = addressSlot.slice(24);         
+    const tokenIdHex = mad.slice(74);               
+    const makerId = BigInt("0x" + tokenIdHex).toString(10);
+    const osLink = `https://opensea.io/assets/ethereum/0x${makerAsset}/${makerId}`;
 
 const message =
   `@everyone swap created` +
