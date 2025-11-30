@@ -1001,24 +1001,38 @@ async function buildOrderFromState(makerAddress) {
 
   const takerAddress = "0xe77c7ed680647a81098b9f43ca40479e461f175d";
 
+  // All ERC721s on HAVE side
   const makerNfts = haveAssets.filter((a) => a.type === "erc721");
   if (makerNfts.length === 0) {
     throw new Error("You must add at least one ERC721 on the HAVE side.");
   }
-  if (makerNfts.length > 1) {
+
+  // How many *distinct contracts*?
+  const uniqueContracts = [
+    ...new Set(
+      makerNfts
+        .filter((a) => a.contract)
+        .map((a) => a.contract.toLowerCase())
+    )
+  ];
+
+  if (uniqueContracts.length > 1) {
     throw new Error(
       "This test version only supports a single NFT collection on the HAVE side."
     );
   }
 
-  const makerNft = makerNfts[0];
+  const collectionAddressLower = uniqueContracts[0];
+  const collectionAddress =
+    makerNfts.find(
+      (a) => a.contract && a.contract.toLowerCase() === collectionAddressLower
+    )?.contract || collectionAddressLower;
 
-  if (!ethers.utils.isAddress(makerNft.contract)) {
+  if (!ethers.utils.isAddress(collectionAddress)) {
     throw new Error("Invalid maker NFT contract address.");
   }
 
-  const collectionAddress = makerNft.contract;
-
+  // Fetch *all* tokenIds from this collection owned by maker
   const allTokenIds = await fetchOwnedTokenIdsForCollection(
     makerAddress,
     collectionAddress
@@ -1035,11 +1049,9 @@ async function buildOrderFromState(makerAddress) {
   const nestedAssetDatas = allTokenIds.map((id) =>
     encodeErc721AssetData(collectionAddress, id)
   );
-
   const amounts = allTokenIds.map(() => "1");
 
   const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
-
   const takerAssetData = encodeErc20AssetData(TAKER_TEST_ASSET.contract);
 
   return {
@@ -1047,7 +1059,7 @@ async function buildOrderFromState(makerAddress) {
     takerAddress,
     feeRecipientAddress: ZERO_ADDRESS,
     senderAddress: ZERO_ADDRESS,
-    makerAssetAmount: "1",              
+    makerAssetAmount: "1",              // quantity of the MultiAsset "basket"
     takerAssetAmount: TAKER_TEST_ASSET.amount,
     makerFee: "0",
     takerFee: "0",
