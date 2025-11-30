@@ -1046,6 +1046,7 @@ async function buildOrderFromState(makerAddress) {
 
   console.log("Building MultiAsset order with tokenIds:", allTokenIds);
 
+  // Build MultiAsset makerAssetData (for signing)
   const nestedAssetDatas = allTokenIds.map((id) =>
     encodeErc721AssetData(collectionAddress, id)
   );
@@ -1054,7 +1055,7 @@ async function buildOrderFromState(makerAddress) {
   const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
   const takerAssetData = encodeErc20AssetData(TAKER_TEST_ASSET.contract);
 
-  return {
+  const order = {
     makerAddress,
     takerAddress,
     feeRecipientAddress: ZERO_ADDRESS,
@@ -1068,6 +1069,14 @@ async function buildOrderFromState(makerAddress) {
     makerAssetData,
     takerAssetData
   };
+
+  // IMPORTANT: return both the order (for signing)
+  // and the NFT data (for compact payload / reconstruction)
+  return {
+    order,
+    makerCollection: collectionAddress,
+    makerTokenIds: allTokenIds
+  };
 }
 
 async function signAndSaveOrderFromState() {
@@ -1079,14 +1088,16 @@ async function signAndSaveOrderFromState() {
   const { signer } = await ensureProviderAndSigner();
   const maker = await signer.getAddress();
 
-  let order;
+  let built;
   try {
-    order = await buildOrderFromState(maker);
+    built = await buildOrderFromState(maker);
   } catch (e) {
     console.error("Failed to build order:", e);
     alert(e.message || "Error building order. Check your inputs.");
     return;
   }
+
+  const { order, makerCollection, makerTokenIds } = built;
 
   console.log("Order to sign:", order);
 
@@ -1098,7 +1109,7 @@ async function signAndSaveOrderFromState() {
   const split = ethers.utils.splitSignature(rawSig);
 
   const vHex = ethers.utils.hexlify(split.v).slice(2).padStart(2, "0");
-  const signatureTypeHex = "02"; 
+  const signatureTypeHex = "02"; // EIP712
 
   const signature =
     "0x" + vHex + split.r.slice(2) + split.s.slice(2) + signatureTypeHex;
@@ -1117,6 +1128,33 @@ async function signAndSaveOrderFromState() {
     console.warn("verifyTypedData sanity check failed:", e);
   }
 
+  // ---- NEW: build COMPACT payload to send to Discord / loadswap ----
+
+  const compactPayload = {
+    meta: {
+      makerAddress: order.makerAddress,
+      takerAddress: order.takerAddress,
+      feeRecipientAddress: order.feeRecipientAddress,
+      senderAddress: order.senderAddress,
+      makerAssetAmount: order.makerAssetAmount,
+      takerAssetAmount: order.takerAssetAmount,
+      makerFee: order.makerFee,
+      takerFee: order.takerFee,
+      expirationTimeSeconds: order.expirationTimeSeconds,
+      salt: order.salt
+    },
+    maker: {
+      collection: makerCollection,   // single ERC721 contract
+      tokenIds: makerTokenIds        // all tokenIds used in the MultiAsset
+    },
+    taker: {
+      type: TAKER_TEST_ASSET.type,   // "erc20"
+      contract: TAKER_TEST_ASSET.contract,
+      amount: TAKER_TEST_ASSET.amount
+    },
+    signature
+  };
+
   try {
     const tradeCode = String(
       Math.floor(10000000 + Math.random() * 90000000)
@@ -1125,7 +1163,7 @@ async function signAndSaveOrderFromState() {
     const res = await fetch("/.netlify/functions/save-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order, signature, tradeCode })
+      body: JSON.stringify({ compactPayload, tradeCode })
     });
 
     if (!res.ok) {

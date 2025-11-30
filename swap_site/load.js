@@ -3,7 +3,8 @@ const ERC20_PROXY_ADDRESS = "0x95E6F48254609A6ee006F7D493c8e5fB97094ceF";
 const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
 const ERC721_PROXY_ID = "0x02571792";
-const ERC20_PROXY_ID = "0xf47261b0";
+const ERC20_PROXY_ID  = "0xf47261b0";
+const MULTI_ASSET_PROXY_ID = "0x94cfcdd7";
 
 const ERC20_ABI = [
   "function allowance(address owner, address spender) view returns (uint256)",
@@ -52,31 +53,49 @@ let signer = null;
 let loadedOrder = null;
 let loadedSignature = null;
 
+// ---------- helpers ----------
+
 function el(id) {
   return document.getElementById(id);
 }
 
-function loadPayloadFromHash() {
-  const raw = window.location.hash;
-  if (!raw || raw.length <= 1) {
-    throw new Error("No swap payload found in URL hash.");
-  }
-
-  const decoded = decodeURIComponent(raw.slice(1));
-  const payload = JSON.parse(decoded);
-
-  if (!payload.order || !payload.signature) {
-    throw new Error("Payload missing order or signature.");
-  }
-
-  return payload;
+// encoding helpers (same idea as in create.js)
+function encodeErc721AssetData(tokenAddress, tokenId) {
+  const encodedParams = ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [tokenAddress, tokenId]
+  );
+  return ERC721_PROXY_ID + encodedParams.slice(2);
 }
 
+function encodeErc20AssetData(tokenAddress) {
+  const encodedParams = ethers.utils.defaultAbiCoder.encode(
+    ["address"],
+    [tokenAddress]
+  );
+  return ERC20_PROXY_ID + encodedParams.slice(2);
+}
+
+function encodeMultiAssetData(amounts, nestedAssetDatas) {
+  if (amounts.length !== nestedAssetDatas.length) {
+    throw new Error("MultiAsset: amounts and assetDatas length mismatch.");
+  }
+
+  const bnAmounts = amounts.map(a => ethers.BigNumber.from(a));
+  const encodedParams = ethers.utils.defaultAbiCoder.encode(
+    ["uint256[]", "bytes[]"],
+    [bnAmounts, nestedAssetDatas]
+  );
+
+  return MULTI_ASSET_PROXY_ID + encodedParams.slice(2);
+}
+
+// decoding helpers (for display)
 function decodeErc721AssetData(assetData) {
   if (!assetData || !assetData.startsWith("0x")) {
     throw new Error("Invalid ERC721 assetData format.");
   }
-  const proxyId = assetData.slice(0, 10).toLowerCase(); 
+  const proxyId = assetData.slice(0, 10).toLowerCase();
   if (proxyId !== ERC721_PROXY_ID.toLowerCase()) {
     throw new Error("assetData is not ERC721 type.");
   }
@@ -97,12 +116,115 @@ function decodeErc20AssetData(assetData) {
     throw new Error("assetData is not ERC20 type.");
   }
   const data = "0x" + assetData.slice(10);
-  const [tokenAddress] = ethers.utils.defaultAbiCoder.decode(
-    ["address"],
-    data
-  );
+  const [tokenAddress] = ethers.utils.defaultAbiCoder.decode(["address"], data);
   return { tokenAddress };
 }
+
+function decodeMultiAssetData(assetData) {
+  if (!assetData || !assetData.startsWith("0x")) {
+    throw new Error("Invalid MultiAsset assetData format.");
+  }
+  const proxyId = assetData.slice(0, 10).toLowerCase();
+  if (proxyId !== MULTI_ASSET_PROXY_ID.toLowerCase()) {
+    throw new Error("assetData is not MultiAsset type.");
+  }
+  const data = "0x" + assetData.slice(10);
+  const [amounts, nestedAssetDatas] = ethers.utils.defaultAbiCoder.decode(
+    ["uint256[]", "bytes[]"],
+    data
+  );
+  return {
+    amounts: amounts.map(a => a.toString()),
+    nestedAssetDatas
+  };
+}
+
+// ---------- load payload from URL ----------
+
+/**
+ * Supports:
+ * 1) Legacy: { order, signature }
+ * 2) Compact v1:
+ *    {
+ *      v: 1,
+ *      maker, taker, feeRecipient, sender,
+ *      makerAmount, takerAmount,
+ *      expiration, salt,
+ *      collection,
+ *      tokenIds: [ "123", "456", ... ],
+ *      takerAsset: { type: "erc20", token, amount },
+ *      sig
+ *    }
+ */
+function loadPayloadFromHash() {
+  const raw = window.location.hash;
+  if (!raw || raw.length <= 1) {
+    throw new Error("No swap payload found in URL hash.");
+  }
+
+  const decoded = decodeURIComponent(raw.slice(1));
+  const payload = JSON.parse(decoded);
+
+  // Case 1: full order already present
+  if (payload.order && payload.signature) {
+    return {
+      order: payload.order,
+      signature: payload.signature
+    };
+  }
+
+  // Case 2: compact v1 format
+  if (payload.v === 1 && payload.collection && Array.isArray(payload.tokenIds)) {
+    const makerAddress       = payload.maker;
+    const takerAddress       = payload.taker;
+    const feeRecipient       = payload.feeRecipient || "0x0000000000000000000000000000000000000000";
+    const sender             = payload.sender      || "0x0000000000000000000000000000000000000000";
+    const makerAssetAmount   = payload.makerAmount;
+    const takerAssetAmount   = payload.takerAmount;
+    const expiration         = payload.expiration;
+    const salt               = payload.salt;
+    const collection         = payload.collection;
+
+    const takerTokenAddress  =
+      (payload.takerAsset && payload.takerAsset.token) || WETH_ADDRESS;
+
+    const tokenIds = payload.tokenIds.map(id => id.toString());
+
+    // rebuild MultiAsset -> makerAssetData
+    const nestedAssetDatas = tokenIds.map(id =>
+      encodeErc721AssetData(collection, id)
+    );
+    const amounts = tokenIds.map(() => "1");
+    const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
+
+    // rebuild takerAssetData
+    const takerAssetData = encodeErc20AssetData(takerTokenAddress);
+
+    const order = {
+      makerAddress,
+      takerAddress,
+      feeRecipientAddress: feeRecipient,
+      senderAddress: sender,
+      makerAssetAmount,
+      takerAssetAmount,
+      makerFee: "0",
+      takerFee: "0",
+      expirationTimeSeconds: expiration,
+      salt,
+      makerAssetData,
+      takerAssetData
+    };
+
+    return {
+      order,
+      signature: payload.sig
+    };
+  }
+
+  throw new Error("Unrecognized swap payload format in URL.");
+}
+
+// ---------- formatting helpers for UI ----------
 
 function formatAddress(addr) {
   if (!addr || addr === "0x0000000000000000000000000000000000000000") {
@@ -132,20 +254,40 @@ function populateUi(order, signature) {
   el("taker").textContent = formatAddress(order.takerAddress);
   el("expires").textContent = formatExpiration(order.expirationTimeSeconds);
 
+  // Maker asset: support MultiAsset (basket of ERC721s) and plain ERC721
   let makerDesc = "";
   try {
-    const { tokenAddress, tokenId } = decodeErc721AssetData(
-      order.makerAssetData
-    );
-    makerDesc = `ERC721 at ${formatAddress(
-      tokenAddress
-    )} #${tokenId} (amount: ${order.makerAssetAmount})`;
+    const proxyId = order.makerAssetData.slice(0, 10).toLowerCase();
+
+    if (proxyId === MULTI_ASSET_PROXY_ID.toLowerCase()) {
+      const { nestedAssetDatas } = decodeMultiAssetData(order.makerAssetData);
+      const decodedNfts = nestedAssetDatas.map(ad => decodeErc721AssetData(ad));
+      const count = decodedNfts.length;
+
+      let collection = "(unknown)";
+      if (count > 0) {
+        collection = decodedNfts[0].tokenAddress;
+      }
+      const ids = decodedNfts.map(n => n.tokenId).join(", ");
+
+      makerDesc =
+        `${count} ERC721s from ${formatAddress(collection)} ` +
+        `(ids: ${ids})`;
+    } else if (proxyId === ERC721_PROXY_ID.toLowerCase()) {
+      const { tokenAddress, tokenId } = decodeErc721AssetData(order.makerAssetData);
+      makerDesc =
+        `ERC721 at ${formatAddress(tokenAddress)} ` +
+        `#${tokenId} (amount: ${order.makerAssetAmount})`;
+    } else {
+      makerDesc = `Raw assetData: ${order.makerAssetData}`;
+    }
   } catch (e) {
-    console.warn("Failed to decode makerAssetData as ERC721:", e);
+    console.warn("Failed to decode makerAssetData:", e);
     makerDesc = `Raw assetData: ${order.makerAssetData}`;
   }
   el("maker-asset").textContent = makerDesc;
 
+  // Taker asset: ERC20 (WETH)
   let takerDesc = "";
   try {
     const { tokenAddress } = decodeErc20AssetData(order.takerAssetData);
@@ -153,7 +295,7 @@ function populateUi(order, signature) {
       tokenAddress.toLowerCase() === WETH_ADDRESS.toLowerCase();
     const amt = formatWethAmountWei(order.takerAssetAmount);
     takerDesc = isWeth
-      ? `${amt} (1 wei) from WETH at ${formatAddress(tokenAddress)}`
+      ? `${amt} from WETH at ${formatAddress(tokenAddress)}`
       : `ERC20 at ${formatAddress(tokenAddress)} amount: ${order.takerAssetAmount}`;
   } catch (e) {
     console.warn("Failed to decode takerAssetData as ERC20:", e);
@@ -167,6 +309,8 @@ function populateUi(order, signature) {
     2
   );
 }
+
+// ---------- wallet + fill logic ----------
 
 async function getProviderAndSigner() {
   if (!window.ethereum) {
@@ -266,7 +410,12 @@ async function fillSwap() {
       signer
     );
 
-    console.log("Calling fillOrder with:", orderStruct, takerAmount.toString(), loadedSignature);
+    console.log(
+      "Calling fillOrder with:",
+      orderStruct,
+      takerAmount.toString(),
+      loadedSignature
+    );
 
     const tx = await exchange.fillOrder(
       orderStruct,
@@ -289,11 +438,13 @@ async function fillSwap() {
   }
 }
 
+// ---------- init ----------
+
 async function init() {
   try {
-    const payload = loadPayloadFromHash();
-    loadedOrder = payload.order;
-    loadedSignature = payload.signature;
+    const { order, signature } = loadPayloadFromHash();
+    loadedOrder = order;
+    loadedSignature = signature;
 
     populateUi(loadedOrder, loadedSignature);
   } catch (err) {
