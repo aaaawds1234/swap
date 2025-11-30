@@ -165,7 +165,7 @@ function loadPayloadFromHash() {
   const decoded = decodeURIComponent(raw.slice(1));
   const payload = JSON.parse(decoded);
 
-  // Case 1: full order already present
+  // ---- Case 1: legacy full order ----
   if (payload.order && payload.signature) {
     return {
       order: payload.order,
@@ -173,31 +173,46 @@ function loadPayloadFromHash() {
     };
   }
 
-  // Case 2: compact v1 format
-  if (payload.v === 1 && payload.collection && Array.isArray(payload.tokenIds)) {
-    const makerAddress       = payload.maker;
-    const takerAddress       = payload.taker;
-    const feeRecipient       = payload.feeRecipient || "0x0000000000000000000000000000000000000000";
-    const sender             = payload.sender      || "0x0000000000000000000000000000000000000000";
-    const makerAssetAmount   = payload.makerAmount;
-    const takerAssetAmount   = payload.takerAmount;
-    const expiration         = payload.expiration;
-    const salt               = payload.salt;
-    const collection         = payload.collection;
+  // ---- Case 2: compact v1 (new) ----
+  if (
+    payload.meta &&
+    payload.meta.v === 1 &&
+    payload.maker &&
+    payload.taker &&
+    payload.orderMeta &&
+    Array.isArray(payload.maker.tokenIds)
+  ) {
+    const makerAddress = payload.maker.address;
+    const takerAddress = payload.taker.address;
 
-    const takerTokenAddress  =
-      (payload.takerAsset && payload.takerAsset.token) || WETH_ADDRESS;
+    const feeRecipient =
+      payload.feeRecipient ||
+      "0x0000000000000000000000000000000000000000";
+    const sender =
+      payload.sender ||
+      "0x0000000000000000000000000000000000000000";
 
-    const tokenIds = payload.tokenIds.map(id => id.toString());
+    // MultiAsset basket is always "1" unit
+    const makerAssetAmount = "1";
+    const takerAssetAmount = payload.taker.amount;
 
-    // rebuild MultiAsset -> makerAssetData
+    const expiration = payload.orderMeta.expiration;
+    const salt = payload.orderMeta.salt;
+
+    const collection = payload.maker.collection;
+    const tokenIds = payload.maker.tokenIds.map(id => id.toString());
+
+    // default to WETH unless you later add a tokenAddress field
+    const takerTokenAddress = WETH_ADDRESS;
+
+    // rebuild MultiAsset makerAssetData
     const nestedAssetDatas = tokenIds.map(id =>
       encodeErc721AssetData(collection, id)
     );
     const amounts = tokenIds.map(() => "1");
     const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
 
-    // rebuild takerAssetData
+    // rebuild takerAssetData (ERC20 -> WETH)
     const takerAssetData = encodeErc20AssetData(takerTokenAddress);
 
     const order = {
@@ -217,7 +232,7 @@ function loadPayloadFromHash() {
 
     return {
       order,
-      signature: payload.sig
+      signature: payload.signature
     };
   }
 

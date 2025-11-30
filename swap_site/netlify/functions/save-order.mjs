@@ -12,24 +12,40 @@ export async function handler(event) {
   }
 
   try {
-    const { compactPayload, tradeCode } = JSON.parse(event.body || "{}");
+    const body = JSON.parse(event.body || "{}");
+    const compact = body.compactPayload;
+    const tradeCode = body.tradeCode;
 
-    if (!compactPayload || !compactPayload.meta || !compactPayload.signature) {
-      return { statusCode: 400, body: "Missing compact payload or signature" };
+    // ---- basic validation of compact payload ----
+    if (
+      !compact ||
+      !compact.meta ||
+      compact.meta.v !== 1 ||
+      !compact.maker ||
+      !compact.taker ||
+      !compact.orderMeta ||
+      !compact.signature
+    ) {
+      console.error("Bad compact payload:", compact);
+      return {
+        statusCode: 400,
+        body: "Missing or invalid compact payload"
+      };
     }
 
-    const encoded = encodeURIComponent(JSON.stringify(compactPayload));
+    // This is what loadswap.html will decode and rebuild into a full 0x order
+    const encoded = encodeURIComponent(JSON.stringify(compact));
     const link = `${APP_BASE_URL}/loadswap.html#${encoded}`;
 
-    // For the Discord message we can show:
-    // - taker amount / token
-    // - collection + count
-    const { meta, maker, taker, signature } = compactPayload;
-    const nftCount = Array.isArray(maker.tokenIds) ? maker.tokenIds.length : 0;
+    const { maker, taker } = compact;
+    const nftCount = Array.isArray(maker.tokenIds)
+      ? maker.tokenIds.length
+      : 0;
 
-    const humanAmount = taker.amount; // you can pretty-print if you want
+    // You can later pretty-print this if you want (e.g. formatUnits).
+    const humanAmount = taker.amount;
 
-    const message =
+    let message =
       `@everyone swap created` +
       `\n\n` +
       `[accept swap](${link})` +
@@ -38,16 +54,31 @@ export async function handler(event) {
       `**${humanAmount} WETH**` +
       `\n\n` +
       `they send:\n` +
-      `${maker.collection} (${nftCount} NFTs)` +
-      (tradeCode
-        ? `\n\ntrade code: \`${tradeCode}\``
-        : "");
+      `${maker.collection} (${nftCount} NFTs)`;
 
-    await fetch(DISCORD_WEBHOOK, {
+    if (tradeCode) {
+      message += `\n\ntrade code: \`${tradeCode}\``;
+    }
+
+    const discordRes = await fetch(DISCORD_WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: message })
     });
+
+    if (!discordRes.ok) {
+      const txt = await discordRes.text().catch(() => "");
+      console.error(
+        "Discord webhook failed:",
+        discordRes.status,
+        discordRes.statusText,
+        txt
+      );
+      return {
+        statusCode: 502,
+        body: "Discord webhook failed"
+      };
+    }
 
     return {
       statusCode: 200,
