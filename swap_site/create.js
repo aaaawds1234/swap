@@ -9,6 +9,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ERC721_PROXY_ID = "0x02571792";
 const ERC20_PROXY_ID = "0xf47261b0"; 
 const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; 
+const MULTI_ASSET_PROXY_ID = "0x94cfcdd7";
 
 const EIP712_DOMAIN = {
   name: "0x Protocol",
@@ -930,7 +931,64 @@ function encodeErc20AssetData(tokenAddress) {
   return ERC20_PROXY_ID + encodedParams.slice(2);
 }
 
-function buildOrderFromState(makerAddress) {
+function encodeMultiAssetData(amounts, nestedAssetDatas) {
+  if (amounts.length !== nestedAssetDatas.length) {
+    throw new Error("MultiAsset: amounts and assetDatas length mismatch.");
+  }
+
+  const bnAmounts = amounts.map((a) => ethers.BigNumber.from(a));
+
+  const encodedParams = ethers.utils.defaultAbiCoder.encode(
+    ["uint256[]", "bytes[]"],
+    [bnAmounts, nestedAssetDatas]
+  );
+
+  return MULTI_ASSET_PROXY_ID + encodedParams.slice(2);
+}
+
+async function fetchOwnedTokenIdsForCollection(owner, contractAddress) {
+  const params = new URLSearchParams({
+    owner,
+    withMetadata: "false",
+    pageSize: "100"
+  });
+  params.append("contractAddresses[]", contractAddress);
+
+  const url = `${ALCHEMY_NFT_ENDPOINT}?${params.toString()}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `Alchemy NFT owner fetch failed: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const data = await res.json();
+  const rawNfts = data.ownedNfts || data.nfts || [];
+
+  const tokenIds = rawNfts.map((nft, idx) => {
+    let id =
+      nft.tokenId ||
+      nft.id?.tokenId ||
+      nft.tokenIdHex ||
+      String(idx); 
+
+    if (typeof id === "string") {
+      if (id.startsWith("0x")) {
+        return ethers.BigNumber.from(id).toString();
+      }
+      if (/^[0-9a-fA-F]+$/.test(id) && !/^\d+$/.test(id)) {
+        return ethers.BigNumber.from("0x" + id).toString();
+      }
+    }
+
+    return id.toString();
+  });
+
+  return tokenIds;
+}
+
+async function buildOrderFromState(makerAddress) {
   const now = Math.floor(Date.now() / 1000);
 
   let expirationTimeSeconds;
@@ -945,13 +1003,11 @@ function buildOrderFromState(makerAddress) {
 
   const makerNfts = haveAssets.filter((a) => a.type === "erc721");
   if (makerNfts.length === 0) {
-    throw new Error(
-      "This prototype only supports a single ERC721 on the HAVE side."
-    );
+    throw new Error("You must add at least one ERC721 on the HAVE side.");
   }
   if (makerNfts.length > 1) {
     throw new Error(
-      "Multiple NFTs in HAVE are not supported yet. Please keep only one ERC721."
+      "This test version only supports a single NFT collection on the HAVE side."
     );
   }
 
@@ -960,34 +1016,46 @@ function buildOrderFromState(makerAddress) {
   if (!ethers.utils.isAddress(makerNft.contract)) {
     throw new Error("Invalid maker NFT contract address.");
   }
-  if (!makerNft.tokenId) {
-    throw new Error("Maker NFT token ID missing.");
+
+  const collectionAddress = makerNft.contract;
+
+  const allTokenIds = await fetchOwnedTokenIdsForCollection(
+    makerAddress,
+    collectionAddress
+  );
+
+  if (!allTokenIds.length) {
+    throw new Error(
+      "No NFTs found in this collection for your wallet (after on-chain check)."
+    );
   }
 
-  const makerAssetData = encodeErc721AssetData(
-    makerNft.contract,
-    ethers.BigNumber.from(makerNft.tokenId).toString()
+  console.log("Building MultiAsset order with tokenIds:", allTokenIds);
+
+  const nestedAssetDatas = allTokenIds.map((id) =>
+    encodeErc721AssetData(collectionAddress, id)
   );
 
-  const takerAssetData = encodeErc20AssetData(
-  TAKER_TEST_ASSET.contract
-  );
+  const amounts = allTokenIds.map(() => "1");
 
+  const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
+
+  const takerAssetData = encodeErc20AssetData(TAKER_TEST_ASSET.contract);
 
   return {
-  makerAddress,
-  takerAddress,
-  feeRecipientAddress: ZERO_ADDRESS,
-  senderAddress: ZERO_ADDRESS,
-  makerAssetAmount: "1",
-  takerAssetAmount: TAKER_TEST_ASSET.amount, 
-  makerFee: "0",
-  takerFee: "0",
-  expirationTimeSeconds: String(expirationTimeSeconds),
-  salt: String(Date.now()),
-  makerAssetData,
-  takerAssetData
-};
+    makerAddress,
+    takerAddress,
+    feeRecipientAddress: ZERO_ADDRESS,
+    senderAddress: ZERO_ADDRESS,
+    makerAssetAmount: "1",              
+    takerAssetAmount: TAKER_TEST_ASSET.amount,
+    makerFee: "0",
+    takerFee: "0",
+    expirationTimeSeconds: String(expirationTimeSeconds),
+    salt: String(Date.now()),
+    makerAssetData,
+    takerAssetData
+  };
 }
 
 async function signAndSaveOrderFromState() {
@@ -1001,7 +1069,7 @@ async function signAndSaveOrderFromState() {
 
   let order;
   try {
-    order = buildOrderFromState(maker);
+    order = await buildOrderFromState(maker);
   } catch (e) {
     console.error("Failed to build order:", e);
     alert(e.message || "Error building order. Check your inputs.");
