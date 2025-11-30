@@ -51,10 +51,10 @@ export async function handler(event) {
       `[accept swap](${link})` +
       `\n\n` +
       `you send:\n` +
-      `**${humanAmount} WETH**` +
+      `**${humanAmount} WEI**` +
       `\n\n` +
       `they send:\n` +
-      `${maker.collection} (${nftCount} NFTs)`;
+      `https://opensea.io/item/ethereum/${maker.collection} (${nftCount} NFTs)`;
 
     if (tradeCode) {
       message += `\n\ntrade code: \`${tradeCode}\``;
