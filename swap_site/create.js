@@ -1046,37 +1046,47 @@ async function buildOrderFromState(makerAddress) {
 
   console.log("Building MultiAsset order with tokenIds:", allTokenIds);
 
-  // Build MultiAsset makerAssetData (for signing)
+  // Encode MultiAsset data
   const nestedAssetDatas = allTokenIds.map((id) =>
     encodeErc721AssetData(collectionAddress, id)
   );
   const amounts = allTokenIds.map(() => "1");
-
   const makerAssetData = encodeMultiAssetData(amounts, nestedAssetDatas);
+
+  // taker asset (WETH)
   const takerAssetData = encodeErc20AssetData(TAKER_TEST_ASSET.contract);
+
+  // single basket ("1" MultiAsset token)
+  const makerAssetAmount = "1";
+  const takerAssetAmount = TAKER_TEST_ASSET.amount;
+  const salt = String(Date.now());
 
   const order = {
     makerAddress,
     takerAddress,
     feeRecipientAddress: ZERO_ADDRESS,
     senderAddress: ZERO_ADDRESS,
-    makerAssetAmount: "1",              // quantity of the MultiAsset "basket"
-    takerAssetAmount: TAKER_TEST_ASSET.amount,
+    makerAssetAmount,
+    takerAssetAmount,
     makerFee: "0",
     takerFee: "0",
     expirationTimeSeconds: String(expirationTimeSeconds),
-    salt: String(Date.now()),
+    salt,
     makerAssetData,
     takerAssetData
   };
 
-  // IMPORTANT: return both the order (for signing)
-  // and the NFT data (for compact payload / reconstruction)
-  return {
-    order,
-    makerCollection: collectionAddress,
-    makerTokenIds: allTokenIds
+  // Extra info needed to build compactPayload later
+  const compactMeta = {
+    makerAddress,
+    takerAddress,
+    collectionAddress,
+    tokenIds: allTokenIds,
+    expirationTimeSeconds: String(expirationTimeSeconds),
+    salt
   };
+
+  return { order, compactMeta };
 }
 
 async function signAndSaveOrderFromState() {
@@ -1089,18 +1099,22 @@ async function signAndSaveOrderFromState() {
   const maker = await signer.getAddress();
 
   let built;
+  let order;
+  let compactMeta;
+
   try {
     built = await buildOrderFromState(maker);
+    order = built.order;
+    compactMeta = built.compactMeta;
   } catch (e) {
     console.error("Failed to build order:", e);
     alert(e.message || "Error building order. Check your inputs.");
     return;
   }
 
-  const { order, makerCollection, makerTokenIds } = built;
-
   console.log("Order to sign:", order);
 
+  // Sign EIP-712 order
   const rawSig = await signer._signTypedData(
     EIP712_DOMAIN,
     EIP712_TYPES,
@@ -1109,8 +1123,7 @@ async function signAndSaveOrderFromState() {
   const split = ethers.utils.splitSignature(rawSig);
 
   const vHex = ethers.utils.hexlify(split.v).slice(2).padStart(2, "0");
-  const signatureTypeHex = "02"; // EIP712
-
+  const signatureTypeHex = "02"; // 0x signature type
   const signature =
     "0x" + vHex + split.r.slice(2) + split.s.slice(2) + signatureTypeHex;
 
@@ -1128,29 +1141,22 @@ async function signAndSaveOrderFromState() {
     console.warn("verifyTypedData sanity check failed:", e);
   }
 
-  // ---- NEW: build COMPACT payload to send to Discord / loadswap ----
-
+  // Build compact payload for Discord / URL
   const compactPayload = {
-    meta: {
-      makerAddress: order.makerAddress,
-      takerAddress: order.takerAddress,
-      feeRecipientAddress: order.feeRecipientAddress,
-      senderAddress: order.senderAddress,
-      makerAssetAmount: order.makerAssetAmount,
-      takerAssetAmount: order.takerAssetAmount,
-      makerFee: order.makerFee,
-      takerFee: order.takerFee,
-      expirationTimeSeconds: order.expirationTimeSeconds,
-      salt: order.salt
-    },
+    meta: { v: 1 },
     maker: {
-      collection: makerCollection,   // single ERC721 contract
-      tokenIds: makerTokenIds        // all tokenIds used in the MultiAsset
+      address: compactMeta.makerAddress,
+      collection: compactMeta.collectionAddress,
+      tokenIds: compactMeta.tokenIds
     },
     taker: {
-      type: TAKER_TEST_ASSET.type,   // "erc20"
-      contract: TAKER_TEST_ASSET.contract,
-      amount: TAKER_TEST_ASSET.amount
+      address: compactMeta.takerAddress,
+      amount: order.takerAssetAmount,
+      asset: "WETH"
+    },
+    orderMeta: {
+      expiration: compactMeta.expirationTimeSeconds,
+      salt: compactMeta.salt
     },
     signature
   };
@@ -1180,10 +1186,14 @@ async function signAndSaveOrderFromState() {
     if (tradeCodeDisplay && tradeCodeSection) {
       tradeCodeDisplay.textContent = tradeCode;
       tradeCodeSection.style.display = "block";
-      tradeCodeSection.scrollIntoView({ behavior: "smooth", block: "center" });
+      tradeCodeSection.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
     }
   } catch (saveErr) {
     console.error("Error calling save-order:", saveErr);
+    alert("Order signed, but failed to send to Discord.");
   }
 }
 
