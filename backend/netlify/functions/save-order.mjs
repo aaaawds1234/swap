@@ -74,11 +74,7 @@ export async function handler(event) {
       `${humanAmount} WEI` +
       `\n\n` +
       `they send:\n` +
-      `${maker.collection} (${nftCount} NFTs)`;
-
-    if (tradeCode) {
-      message += `\n\ntrade code: \`${tradeCode}\``;
-    }
+      `https://opensea.io/item/ethereum/${maker.collection} (${nftCount} NFTs)`;
 
     const discordRes = await fetch(DISCORD_WEBHOOK, {
       method: "POST",
@@ -89,7 +85,7 @@ export async function handler(event) {
     if (!discordRes.ok) {
       const txt = await discordRes.text().catch(() => "");
       console.error(
-        "Discord webhook failed:",
+        "Failed:",
         discordRes.status,
         discordRes.statusText,
         txt
@@ -97,7 +93,7 @@ export async function handler(event) {
       return {
         statusCode: 502,
         headers: CORS_HEADERS,
-        body: "Discord webhook failed"
+        body: "Failed"
       };
     }
 
