@@ -1,25 +1,41 @@
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-const APP_BASE_URL = process.env.APP_BASE_URL;
+const APP_BASE_URL    = process.env.APP_BASE_URL;
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "*",         
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
 export async function handler(event) {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ""
+    };
+  }
+
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method not allowed" };
+    return {
+      statusCode: 405,
+      headers: CORS_HEADERS,
+      body: "Method not allowed"
+    };
   }
 
   if (!DISCORD_WEBHOOK || !APP_BASE_URL) {
     console.error("Missing DISCORD_WEBHOOK_URL or APP_BASE_URL");
-    return { statusCode: 500, body: "Server not configured" };
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: "Server not configured"
+    };
   }
 
   try {
     const body = JSON.parse(event.body || "{}");
-    const compact = body.compactPayload;
+    const compact   = body.compactPayload;
     const tradeCode = body.tradeCode;
 
     if (
@@ -34,6 +50,7 @@ export async function handler(event) {
       console.error("Bad compact payload:", compact);
       return {
         statusCode: 400,
+        headers: CORS_HEADERS,
         body: "Missing or invalid compact payload"
       };
     }
@@ -46,7 +63,7 @@ export async function handler(event) {
       ? maker.tokenIds.length
       : 0;
 
-    const humanAmount = taker.amount;
+    const humanAmount = taker.amount; 
 
     let message =
       `@everyone swap created` +
@@ -57,7 +74,11 @@ export async function handler(event) {
       `${humanAmount} WEI` +
       `\n\n` +
       `they send:\n` +
-      `https://opensea.io/item/ethereum/${maker.collection} (${nftCount} NFTs)`;
+      `${maker.collection} (${nftCount} NFTs)`;
+
+    if (tradeCode) {
+      message += `\n\ntrade code: \`${tradeCode}\``;
+    }
 
     const discordRes = await fetch(DISCORD_WEBHOOK, {
       method: "POST",
@@ -75,16 +96,22 @@ export async function handler(event) {
       );
       return {
         statusCode: 502,
+        headers: CORS_HEADERS,
         body: "Discord webhook failed"
       };
     }
 
     return {
       statusCode: 200,
+      headers: CORS_HEADERS,
       body: JSON.stringify({ link })
     };
   } catch (err) {
     console.error("save-order error:", err);
-    return { statusCode: 500, body: "Internal Error" };
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: "Internal Error"
+    };
   }
 }
