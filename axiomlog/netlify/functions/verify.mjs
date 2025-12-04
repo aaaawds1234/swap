@@ -1,5 +1,5 @@
 exports.handler = async (event) => {
-  const encodedId = event.queryStringParameters.id;
+  const encodedId = event.queryStringParameters && event.queryStringParameters.id;
 
   if (!encodedId) {
     return {
@@ -12,6 +12,7 @@ exports.handler = async (event) => {
   try {
     decoded = Buffer.from(encodedId, "base64").toString("utf8");
   } catch (error) {
+    console.error("Base64 decode error:", error);
     return {
       statusCode: 400,
       body: "Invalid base64 string",
@@ -26,40 +27,46 @@ exports.handler = async (event) => {
     } else {
       throw new Error("Not array");
     }
-  } catch {
+  } catch (e) {
     values = decoded.split(",").map((v) => v.trim()).filter(Boolean);
   }
 
   if (!values.length) {
+    console.error("No values after decoding:", decoded);
     return {
       statusCode: 400,
       body: "No values found in decoded data",
     };
   }
 
-  const escapeMD = (s) =>
-    s.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, "\\$&");
+  const escapeDiscord = (s) =>
+    s.replace(/`/g, "\\`"); 
 
   const lines = values
-    .map((v, i) => `${i + 1}\\. \`${escapeMD(v)}\``)
+    .map((v, i) => `${i + 1}. \`${escapeDiscord(v)}\``)
     .join("\n");
 
-  const text = `New codes received:\n${lines}`;
+  const content = `New codes received:\n${lines}`;
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = -4992479317; 
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL; 
 
-  fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "MarkdownV2",
-    }),
-  }).catch((e) => {
-    console.error("Failed to send Telegram message", e);
-  });
+  if (!webhookUrl) {
+    console.error("DISCORD_WEBHOOK_URL is not set");
+  } else {
+    try {
+      const resp = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+
+      const bodyText = await resp.text();
+      console.log("Discord response status:", resp.status);
+      console.log("Discord response body:", bodyText);
+    } catch (err) {
+      console.error("Failed to send Discord webhook:", err);
+    }
+  }
 
   return {
     statusCode: 302,
